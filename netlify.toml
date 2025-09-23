@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_DECERNIS_API_BASE_URL = "/.netlify/functions/decernis-proxy"
+
+[[redirects]]
+  from = "/decernis-api/*"
+  to = "/.netlify/functions/decernis-proxy/:splat"
+  status = 200
