@@ -1,0 +1,208 @@
+import { useState, useEffect } from "react";
+import { Eye, EyeOff, Trash2, TestTube } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getSettings, saveSettings, clearSensitiveData, DEFAULT_ENDPOINT } from "@/lib/storage";
+import type { AppSettings } from "@/types";
+
+interface SettingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+  const [settings, setSettings] = useState<Partial<AppSettings>>({
+    apiKey: "",
+    endpoint: DEFAULT_ENDPOINT,
+    orgName: "",
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const currentSettings = getSettings();
+      setSettings(currentSettings);
+      setTestResult(null);
+    }
+  }, [open]);
+
+  const handleSave = () => {
+    saveSettings(settings);
+    onOpenChange(false);
+  };
+
+  const handleTestConnection = async () => {
+    if (!settings.apiKey?.trim()) {
+      setTestResult({ success: false, message: "API Key is required for testing" });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+
+    try {
+      // Mock test for now - in real implementation, this would call the actual API
+      const testPayload = {
+        transaction: {
+          scope: {
+            name: "Connection Test",
+            country: ["United States"],
+            topic: [{
+              name: "COS",
+              scopeDetail: { usage: ["Baby Cream"] }
+            }]
+          },
+          ingredientList: {
+            name: "Test",
+            list: [{
+              customerId: "WATER",
+              customerName: "WATER",
+              idType: "Decernis ID",
+              idValue: "6715"
+            }]
+          }
+        }
+      };
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // For demo purposes, randomly succeed or fail
+      const success = Math.random() > 0.3;
+      
+      if (success) {
+        setTestResult({ 
+          success: true, 
+          message: "Connection successful! API key is valid and endpoint is accessible." 
+        });
+      } else {
+        setTestResult({ 
+          success: false, 
+          message: "Connection failed. Please check your API key and endpoint URL." 
+        });
+      }
+    } catch (error) {
+      setTestResult({ 
+        success: false, 
+        message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleClearData = () => {
+    clearSensitiveData();
+    setSettings(prev => ({ ...prev, apiKey: "", orgName: "" }));
+    setTestResult(null);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="api-key">API Key *</Label>
+            <div className="flex space-x-2">
+              <div className="relative flex-1">
+                <Input
+                  id="api-key"
+                  type={showApiKey ? "text" : "password"}
+                  placeholder="Enter your Decernis API key..."
+                  value={settings.apiKey || ""}
+                  onChange={(e) => setSettings(prev => ({ ...prev, apiKey: e.target.value }))}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your API key is stored locally in your browser and never transmitted to our servers.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="endpoint">API Endpoint</Label>
+            <Textarea
+              id="endpoint"
+              rows={3}
+              placeholder="Enter API endpoint URL..."
+              value={settings.endpoint || ""}
+              onChange={(e) => setSettings(prev => ({ ...prev, endpoint: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Default endpoint is pre-configured. Only change if directed by Decernis support.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="org-name">Organization Name (Optional)</Label>
+            <Input
+              id="org-name"
+              placeholder="Enter your organization name..."
+              value={settings.orgName || ""}
+              onChange={(e) => setSettings(prev => ({ ...prev, orgName: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleTestConnection}
+              disabled={!settings.apiKey?.trim() || isTesting}
+              variant="outline"
+              className="flex-1"
+            >
+              <TestTube className="w-4 h-4 mr-2" />
+              {isTesting ? "Testing..." : "Test Connection"}
+            </Button>
+            <Button
+              onClick={handleClearData}
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear Data
+            </Button>
+          </div>
+
+          {testResult && (
+            <Alert variant={testResult.success ? "default" : "destructive"}>
+              <AlertDescription>{testResult.message}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end space-x-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              Save Settings
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

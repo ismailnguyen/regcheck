@@ -1,0 +1,90 @@
+// Core data types for RegCheck application
+
+export type Country = string;
+export type Usage = string;
+export type IdType = "CAS" | "INCI name" | "Decernis ID" | "FEMA No." | "E No." | "INS No.";
+
+export interface IngredientInput {
+  id: string;
+  name: string;
+  idType: IdType;
+  idValue: string;
+}
+
+export interface ScenarioInput {
+  id: string;
+  name: string;
+  countries: Country[];
+  usages: Usage[];
+  ingredients: IngredientInput[];
+  createdAt: string;
+  updatedAt: string;
+  status?: "Draft" | "Passed" | "Failed" | "Blocked";
+  lastRunAt?: string;
+  lastSummary?: ResultSummary;
+}
+
+export interface ResultComments {
+  nameOnList?: string | null;
+  functionOnList?: string | null;
+  usageOnList?: string | null;
+  comments?: string | null;
+}
+
+export interface ReportRow {
+  customerId: string;
+  customerName: string;
+  idType: IdType | string;
+  idValue: string;
+  decernisId?: number | null;
+  decernisName?: string | null;
+  country: string;
+  usage: string;
+  function?: string | null;
+  resultIndicator: string;
+  threshold?: string | null;
+  citation?: string | null;
+  color?: string | null;
+  comments?: ResultComments | null;
+  hyperlink?: string | null;
+}
+
+export interface IngredientAnalysisReport {
+  reportId: string;
+  reportDateTime: string;
+  ["ingredient-list-name"]: string;
+  tabularReport: ReportRow[];
+}
+
+export interface ApiResponse {
+  ingredientAnalysisReport: IngredientAnalysisReport;
+}
+
+export interface ResultSummary {
+  countsByIndicator: Record<string, number>;
+  total: number;
+}
+
+export interface AppSettings {
+  apiKey: string;
+  endpoint: string;
+  orgName?: string;
+}
+
+// Built-in data constants
+export const COUNTRIES: Country[] = [
+  "United States", "Japan", "United Kingdom", "Northern Ireland", "Portugal", 
+  "India", "Spain", "Canada", "Latvia", "Sweden", "Netherlands", "Belgium", 
+  "China", "Poland", "Italy", "France", "Australia", "Lithuania", "Germany", "Estonia"
+];
+
+export const USAGES: Usage[] = [
+  "Baby Cream", "Eye Concealer", "Antidandruff", "Artificial Nail", "Baby Oil", 
+  "Eyeliner", "Eye Cream", "Eye Mask", "Face Scrub", "Face Serum", "Rouges", 
+  "Hair Bleaching", "Hair Conditioner", "Lip balm", "Lip Gloss", "Lip Pencil", 
+  "Lipstick", "Nail Polish", "Toothpaste", "Body Lotion"
+];
+
+export const ID_TYPES: IdType[] = [
+  "Decernis ID", "CAS", "INCI name", "FEMA No.", "E No.", "INS No."
+];
