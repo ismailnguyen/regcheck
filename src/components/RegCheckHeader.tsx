@@ -42,7 +42,7 @@ export function RegCheckHeader({
             {isRunning ? "Running..." : "Run Validation"}
           </Button>
           
-          <DropdownMenu>
+          {/* <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 <Save className="w-4 h-4 mr-2" />
@@ -67,7 +67,7 @@ export function RegCheckHeader({
                 Export JSON
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu> */}
           
           <Button variant="outline" onClick={onSettingsClick}>
             <Settings className="w-4 h-4" />

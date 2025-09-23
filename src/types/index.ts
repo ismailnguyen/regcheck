@@ -69,6 +69,27 @@ export interface AppSettings {
   apiKey: string;
   endpoint: string;
   orgName?: string;
+  debugMode?: boolean;
+}
+
+export interface DebugRequestInfo {
+  method: string;
+  url: string;
+  payload: unknown;
+}
+
+export interface DebugResponseInfo {
+  durationMs: number;
+  status: number;
+  weightBytes?: number;
+  body: unknown;
+  statusText?: string;
+}
+
+export interface DebugInfo {
+  request: DebugRequestInfo;
+  response: DebugResponseInfo;
+  errorMessage?: string;
 }
 
 // Built-in data constants

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getSettings, saveSettings, clearSensitiveData, DEFAULT_ENDPOINT } from "@/lib/storage";
+import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/types";
 
 interface SettingsDialogProps {
@@ -24,6 +25,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     apiKey: "",
     endpoint: DEFAULT_ENDPOINT,
     orgName: "",
+    debugMode: false,
   });
   const [showApiKey, setShowApiKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -164,6 +166,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               placeholder="Enter your organization name..."
               value={settings.orgName || ""}
               onChange={(e) => setSettings(prev => ({ ...prev, orgName: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-1">
+              <Label htmlFor="debug-mode">Debug mode</Label>
+              <p className="text-xs text-muted-foreground">
+                Show API request and response details after each validation run.
+              </p>
+            </div>
+            <Switch
+              id="debug-mode"
+              checked={Boolean(settings.debugMode)}
+              onCheckedChange={(checked) => setSettings(prev => ({ ...prev, debugMode: checked }))}
             />
           </div>
 

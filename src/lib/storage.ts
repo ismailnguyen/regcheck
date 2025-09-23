@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   ENDPOINT: "regcheck.endpoint",
   ORG_NAME: "regcheck.orgName",
   SCENARIOS: "regcheck.scenarios",
+  DEBUG_MODE: "regcheck.debugMode",
 } as const;
 
 export const DEFAULT_ENDPOINT = "https://api.decernis.com/v5/ingredient-analysis/transaction?report=tabular";
@@ -16,6 +17,7 @@ export const getSettings = (): Partial<AppSettings> => {
     apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || "",
     endpoint: localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_ENDPOINT,
     orgName: localStorage.getItem(STORAGE_KEYS.ORG_NAME) || "",
+    debugMode: localStorage.getItem(STORAGE_KEYS.DEBUG_MODE) === "true",
   };
 };
 
@@ -38,6 +40,10 @@ export const saveSettings = (settings: Partial<AppSettings>): void => {
     } else {
       localStorage.removeItem(STORAGE_KEYS.ORG_NAME);
     }
+  }
+
+  if (settings.debugMode !== undefined) {
+    localStorage.setItem(STORAGE_KEYS.DEBUG_MODE, settings.debugMode ? "true" : "false");
   }
 };
 
