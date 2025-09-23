@@ -50,54 +50,86 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       return;
     }
 
-    setIsTesting(true);
-    setTestResult(null);
+    const endpoint = settings.endpoint?.trim() || DEFAULT_ENDPOINT;
 
-    try {
-      // Mock test for now - in real implementation, this would call the actual API
-      const testPayload = {
-        transaction: {
-          scope: {
-            name: "Connection Test",
-            country: ["United States"],
-            topic: [{
+    const testPayload = {
+      transaction: {
+        scope: {
+          name: "Connection Test",
+          country: ["United States"],
+          topic: [
+            {
               name: "COS",
-              scopeDetail: { usage: ["Baby Cream"] }
-            }]
-          },
-          ingredientList: {
-            name: "Test",
-            list: [{
+              scopeDetail: {
+                usage: ["Baby Cream"],
+              },
+            },
+          ],
+        },
+        ingredientList: {
+          name: "Test",
+          list: [
+            {
               customerId: "WATER",
               customerName: "WATER",
               idType: "Decernis ID",
-              idValue: "6715"
-            }]
+              idValue: "6715",
+            },
+          ],
+        },
+        ...(settings.orgName ? { organization: settings.orgName } : {}),
+      },
+    };
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.apiKey.trim()}`,
+      "x-api-key": settings.apiKey.trim(),
+    };
+
+    if (settings.orgName?.trim()) {
+      headers["X-Decernis-Organization"] = settings.orgName.trim();
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+
+    const startedAt = Date.now();
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(testPayload),
+      });
+
+      const duration = Date.now() - startedAt;
+      const text = await response.text();
+
+      if (!response.ok) {
+        let message = `Test failed with status ${response.status}`;
+        if (text) {
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed?.message) {
+              message = parsed.message;
+            }
+          } catch {
+            // keep default message
           }
         }
-      };
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For demo purposes, randomly succeed or fail
-      const success = Math.random() > 0.3;
-      
-      if (success) {
-        setTestResult({ 
-          success: true, 
-          message: "Connection successful! API key is valid and endpoint is accessible." 
-        });
-      } else {
-        setTestResult({ 
-          success: false, 
-          message: "Connection failed. Please check your API key and endpoint URL." 
-        });
+        throw new Error(message);
       }
+
+      setTestResult({
+        success: true,
+        message: `Connection successful (status ${response.status}, ${duration} ms).`,
+      });
     } catch (error) {
-      setTestResult({ 
-        success: false, 
-        message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setTestResult({
+        success: false,
+        message: `Connection failed: ${message}`,
       });
     } finally {
       setIsTesting(false);
