@@ -260,9 +260,18 @@ export function IngredientsBuilder({
                 </ul>
               </div>
             )}
-            
+
             {ingredients.length === 0 && (
               <p className="text-sm text-destructive">At least one ingredient is required</p>
+            )}
+
+            {ingredients.length >= 3 && (
+              <div className="flex justify-end">
+                <Button onClick={addIngredient} size="sm" className="mt-2">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Ingredient
+                </Button>
+              </div>
             )}
           </div>
         )}
