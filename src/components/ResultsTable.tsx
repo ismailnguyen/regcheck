@@ -105,14 +105,15 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
 
   const columns = [
     { key: 'customerName', label: 'Ingredient Name', filterable: true },
-    { key: 'idType', label: 'ID Type', filterable: true },
-    { key: 'idValue', label: 'ID Value', filterable: true },
     { key: 'country', label: 'Country', filterable: true },
     { key: 'usage', label: 'Usage', filterable: true },
-    { key: 'resultIndicator', label: 'Status', filterable: true },
+    { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
+    { key: 'threshold', label: 'Restriction Level', filterable: true },
+    { key: 'citation', label: 'Legal Quote', filterable: false },
+    { key: 'idType', label: 'ID Type', filterable: true },
+    { key: 'idValue', label: 'ID Value', filterable: true },
     { key: 'decernisName', label: 'Decernis Name', filterable: true },
     { key: 'function', label: 'Function', filterable: true },
-    { key: 'citation', label: 'Citation', filterable: false },
   ];
 
   if (isLoading) {
@@ -201,14 +202,15 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
                 {paginatedData.map((row, index) => (
                   <TableRow key={`${row.customerId}-${row.country}-${row.usage}-${index}`}>
                     <TableCell className="font-medium">{row.customerName || '–'}</TableCell>
-                    <TableCell>{row.idType || '–'}</TableCell>
-                    <TableCell>{row.idValue || '–'}</TableCell>
                     <TableCell>{row.country || '–'}</TableCell>
                     <TableCell>{row.usage || '–'}</TableCell>
                     <TableCell>{getStatusBadge(row.resultIndicator)}</TableCell>
+                    <TableCell>{row.threshold || '–'}</TableCell>
+                    <TableCell className="max-w-xs truncate" title={row.citation || ''}>{row.citation || '–'}</TableCell>
+                    <TableCell>{row.idType || '–'}</TableCell>
+                    <TableCell>{row.idValue || '–'}</TableCell>
                     <TableCell>{row.decernisName || '–'}</TableCell>
                     <TableCell>{row.function || '–'}</TableCell>
-                    <TableCell className="max-w-xs truncate">{row.citation || '–'}</TableCell>
                     <TableCell>
                       {row.hyperlink && (
                         <Button variant="ghost" size="sm" asChild>

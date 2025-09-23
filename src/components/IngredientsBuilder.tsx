@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Copy, Upload } from "lucide-react";
+import { Plus, Trash2, Copy, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { getStoredIngredients } from "@/lib/storage";
 import { ID_TYPES } from "@/types";
 import type { IngredientInput, IdType } from "@/types";
 
@@ -31,6 +45,9 @@ export function IngredientsBuilder({
   ingredients,
   onIngredientsChange,
 }: IngredientsBuilderProps) {
+  const [autoCompleteOpen, setAutoCompleteOpen] = useState<string | null>(null);
+  const storedIngredients = getStoredIngredients();
+
   const addIngredient = () => {
     const newIngredient: IngredientInput = {
       id: crypto.randomUUID(),
@@ -46,6 +63,19 @@ export function IngredientsBuilder({
       ingredient.id === id ? { ...ingredient, [field]: value } : ingredient
     );
     onIngredientsChange(updated);
+  };
+
+  const selectStoredIngredient = (id: string, stored: IngredientInput) => {
+    const updated = ingredients.map(ingredient =>
+      ingredient.id === id ? { 
+        ...ingredient, 
+        name: stored.name, 
+        idType: stored.idType, 
+        idValue: stored.idValue 
+      } : ingredient
+    );
+    onIngredientsChange(updated);
+    setAutoCompleteOpen(null);
   };
 
   const duplicateIngredient = (id: string) => {
@@ -95,10 +125,6 @@ export function IngredientsBuilder({
             <Plus className="w-4 h-4 mr-2" />
             Add Ingredient
           </Button>
-          <Button variant="outline" size="sm" disabled>
-            <Upload className="w-4 h-4 mr-2" />
-            Bulk Import
-          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -127,12 +153,50 @@ export function IngredientsBuilder({
                       <TableRow key={ingredient.id} className={error ? "border-l-2 border-l-destructive" : ""}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
                         <TableCell>
-                          <Input
-                            value={ingredient.name}
-                            onChange={(e) => updateIngredient(ingredient.id, "name", e.target.value)}
-                            placeholder="Enter ingredient name..."
-                            className={error?.includes("Name") ? "border-destructive" : ""}
-                          />
+                          <Popover open={autoCompleteOpen === ingredient.id} onOpenChange={(open) => setAutoCompleteOpen(open ? ingredient.id : null)}>
+                            <PopoverTrigger asChild>
+                              <div className="relative">
+                                <Input
+                                  value={ingredient.name}
+                                  onChange={(e) => updateIngredient(ingredient.id, "name", e.target.value)}
+                                  placeholder="Enter ingredient name..."
+                                  className={error?.includes("Name") ? "border-destructive pr-8" : "pr-8"}
+                                />
+                                {storedIngredients.length > 0 && (
+                                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                )}
+                              </div>
+                            </PopoverTrigger>
+                            {storedIngredients.length > 0 && (
+                              <PopoverContent className="p-0 w-80" align="start">
+                                <Command>
+                                  <CommandInput placeholder="Search stored ingredients..." />
+                                  <CommandList>
+                                    <CommandEmpty>No stored ingredients found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {storedIngredients
+                                        .filter(stored => 
+                                          ingredient.name === "" || 
+                                          stored.name.toLowerCase().includes(ingredient.name.toLowerCase())
+                                        )
+                                        .map((stored, index) => (
+                                          <CommandItem
+                                            key={index}
+                                            onSelect={() => selectStoredIngredient(ingredient.id, stored)}
+                                            className="cursor-pointer"
+                                          >
+                                            <div className="flex flex-col">
+                                              <span className="font-medium">{stored.name}</span>
+                                              <span className="text-sm text-muted-foreground">{stored.idType}: {stored.idValue}</span>
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            )}
+                          </Popover>
                         </TableCell>
                         <TableCell>
                           <Select

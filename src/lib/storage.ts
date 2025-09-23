@@ -1,4 +1,4 @@
-import type { AppSettings, ScenarioInput } from "@/types";
+import type { AppSettings, ScenarioInput, IngredientInput } from "@/types";
 
 // Local Storage keys
 const STORAGE_KEYS = {
@@ -72,4 +72,28 @@ export const saveScenario = (scenario: ScenarioInput): void => {
 export const deleteScenario = (id: string): void => {
   const scenarios = getScenarios().filter(s => s.id !== id);
   localStorage.setItem(STORAGE_KEYS.SCENARIOS, JSON.stringify(scenarios));
+};
+
+// Ingredients history management
+export const getStoredIngredients = (): IngredientInput[] => {
+  try {
+    const stored = localStorage.getItem('regcheck.ingredients');
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const storeIngredient = (ingredient: IngredientInput): void => {
+  const stored = getStoredIngredients();
+  const exists = stored.some(item => 
+    item.name.toLowerCase() === ingredient.name.toLowerCase() && 
+    item.idType === ingredient.idType && 
+    item.idValue === ingredient.idValue
+  );
+  
+  if (!exists) {
+    stored.push(ingredient);
+    localStorage.setItem('regcheck.ingredients', JSON.stringify(stored));
+  }
 };

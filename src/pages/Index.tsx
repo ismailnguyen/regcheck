@@ -4,7 +4,7 @@ import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { IngredientsBuilder } from "@/components/IngredientsBuilder";
 import { ResultsTable } from "@/components/ResultsTable";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { getSettings } from "@/lib/storage";
+import { getSettings, storeIngredient } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import type { Country, Usage, IngredientInput, ReportRow, ResultSummary } from "@/types";
 
@@ -89,6 +89,11 @@ const Index = () => {
           (summary.countsByIndicator[result.resultIndicator] || 0) + 1;
       });
       
+      // Store ingredients for future autocomplete
+      ingredients.forEach(ingredient => {
+        storeIngredient(ingredient);
+      });
+      
       setResults(mockResults);
       setResultsSummary(summary);
       
@@ -134,7 +139,7 @@ const Index = () => {
       />
       
       <div className="container mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={`grid gap-6 ${results.length > 0 || isRunning ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
           {/* Left Panel - Inputs */}
           <div className="space-y-6">
             <ScopeBuilder
@@ -153,13 +158,15 @@ const Index = () => {
           </div>
           
           {/* Right Panel - Results */}
-          <div>
-            <ResultsTable
-              data={results}
-              summary={resultsSummary}
-              isLoading={isRunning}
-            />
-          </div>
+          {(results.length > 0 || isRunning) && (
+            <div>
+              <ResultsTable
+                data={results}
+                summary={resultsSummary}
+                isLoading={isRunning}
+              />
+            </div>
+          )}
         </div>
       </div>
       
