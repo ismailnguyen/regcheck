@@ -54,9 +54,6 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord }:
                       <div className="flex flex-col items-start">
                         <span className="font-semibold truncate w-full">{record.name}</span>
                         <span className="text-xs text-muted-foreground">{formatDate(record.createdAt)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {record.summary.total} result{record.summary.total === 1 ? "" : "s"}
-                        </span>
                       </div>
                     </Button>
                   ))}
