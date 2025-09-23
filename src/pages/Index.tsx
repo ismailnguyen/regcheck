@@ -139,9 +139,18 @@ const Index = () => {
       />
       
       <div className="container mx-auto p-6">
-        <div className={`grid gap-6 ${results.length > 0 || isRunning ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-          {/* Left Panel - Inputs */}
-          <div className="space-y-6">
+        <div className="grid gap-6 grid-cols-3">
+          {(results.length > 0 || isRunning) && (
+            <div className="col-span-3">
+            <ResultsTable
+              data={results}
+              summary={resultsSummary}
+              isLoading={isRunning}
+            />
+          </div>
+          )}
+          {/* Left Panel */}
+          <div>
             <ScopeBuilder
               scenarioName={scenarioName}
               countries={countries}
@@ -150,23 +159,16 @@ const Index = () => {
               onCountriesChange={setCountries}
               onUsagesChange={setUsages}
             />
-            
-            <IngredientsBuilder
+          </div>
+          
+          {/* Right Panel */}
+            <div className="col-span-2">
+              <IngredientsBuilder
               ingredients={ingredients}
               onIngredientsChange={setIngredients}
             />
-          </div>
-          
-          {/* Right Panel - Results */}
-          {(results.length > 0 || isRunning) && (
-            <div>
-              <ResultsTable
-                data={results}
-                summary={resultsSummary}
-                isLoading={isRunning}
-              />
             </div>
-          )}
+          
         </div>
       </div>
       
