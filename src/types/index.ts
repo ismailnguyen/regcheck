@@ -72,6 +72,22 @@ export interface AppSettings {
   debugMode?: boolean;
 }
 
+export interface ValidationScenarioSnapshot {
+  name?: string;
+  countries: Country[];
+  usages: Usage[];
+  ingredients: IngredientInput[];
+}
+
+export interface ValidationResultRecord {
+  id: string;
+  name: string;
+  createdAt: string;
+  summary: ResultSummary;
+  results: ReportRow[];
+  scenario: ValidationScenarioSnapshot;
+}
+
 export interface DebugRequestInfo {
   method: string;
   url: string;

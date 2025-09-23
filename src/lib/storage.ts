@@ -1,4 +1,9 @@
-import type { AppSettings, ScenarioInput, IngredientInput } from "@/types";
+import type {
+  AppSettings,
+  ScenarioInput,
+  IngredientInput,
+  ValidationResultRecord,
+} from "@/types";
 
 const API_BASE_URL = import.meta.env.VITE_DECERNIS_API_BASE_URL
   || (import.meta.env.DEV ? "/decernis-api" : "https://api.decernis.com");
@@ -10,6 +15,7 @@ const STORAGE_KEYS = {
   ORG_NAME: "regcheck.orgName",
   SCENARIOS: "regcheck.scenarios",
   DEBUG_MODE: "regcheck.debugMode",
+  VALIDATION_HISTORY: "regcheck.validationHistory",
 } as const;
 
 export const DEFAULT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
@@ -53,6 +59,22 @@ export const saveSettings = (settings: Partial<AppSettings>): void => {
 export const clearSensitiveData = (): void => {
   localStorage.removeItem(STORAGE_KEYS.API_KEY);
   localStorage.removeItem(STORAGE_KEYS.ORG_NAME);
+};
+
+// Validation history management
+export const getValidationHistory = (): ValidationResultRecord[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.VALIDATION_HISTORY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveValidationResult = (record: ValidationResultRecord): void => {
+  const history = getValidationHistory();
+  history.unshift(record);
+  localStorage.setItem(STORAGE_KEYS.VALIDATION_HISTORY, JSON.stringify(history));
 };
 
 // Scenarios management

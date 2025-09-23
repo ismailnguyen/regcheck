@@ -1,13 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RegCheckHeader } from "@/components/RegCheckHeader";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { IngredientsBuilder } from "@/components/IngredientsBuilder";
 import { ResultsTable } from "@/components/ResultsTable";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { DebugPanel } from "@/components/DebugPanel";
-import { getSettings, storeIngredient, DEFAULT_ENDPOINT } from "@/lib/storage";
+import { ValidationHistory } from "@/components/ValidationHistory";
+import {
+  getSettings,
+  storeIngredient,
+  DEFAULT_ENDPOINT,
+  getValidationHistory,
+  saveValidationResult,
+} from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
-import type { Country, Usage, IngredientInput, ReportRow, ResultSummary, DebugInfo, ApiResponse } from "@/types";
+import type {
+  Country,
+  Usage,
+  IngredientInput,
+  ReportRow,
+  ResultSummary,
+  DebugInfo,
+  ApiResponse,
+  ValidationResultRecord,
+} from "@/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
   // Settings state
@@ -24,6 +41,17 @@ const Index = () => {
   const [resultsSummary, setResultsSummary] = useState<ResultSummary>();
   const [isRunning, setIsRunning] = useState(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [validationHistory, setValidationHistory] = useState<ValidationResultRecord[]>([]);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'builder' | 'history'>('builder');
+
+  useEffect(() => {
+    const history = getValidationHistory();
+    setValidationHistory(history);
+    if (history.length > 0) {
+      setSelectedHistoryId(history[0].id);
+    }
+  }, []);
 
   const canRun = countries.length > 0 && usages.length > 0 && ingredients.length > 0 && 
     ingredients.every(ing => ing.name.trim() && ing.idValue.trim());
@@ -178,6 +206,28 @@ const Index = () => {
           : "The API call completed successfully but returned no results.",
       });
 
+      const recordName = scenarioName.trim() || `Scenario ${new Date().toLocaleString()}`;
+      const record: ValidationResultRecord = {
+        id: crypto.randomUUID(),
+        name: recordName,
+        createdAt: new Date().toISOString(),
+        summary: {
+          countsByIndicator: { ...summary.countsByIndicator },
+          total: summary.total,
+        },
+        results: normalizedResults,
+        scenario: {
+          name: scenarioName.trim() || undefined,
+          countries: [...countries],
+          usages: [...usages],
+          ingredients: ingredients.map((ingredient) => ({ ...ingredient })),
+        },
+      };
+
+      saveValidationResult(record);
+      setValidationHistory(prev => [record, ...prev]);
+      setSelectedHistoryId(record.id);
+
       if (debugEnabled) {
         const durationMs = Date.now() - requestStartedAt;
         setDebugInfo({
@@ -245,42 +295,60 @@ const Index = () => {
       />
       
       <div className="container mx-auto p-6">
-        <div className="grid gap-6 grid-cols-3">
-          {(results.length > 0 || isRunning) && (
-            <div className="col-span-3">
-              <ResultsTable
-                data={results}
-                summary={resultsSummary}
-                isLoading={isRunning}
-              />
-            </div>
-          )}
-          {debugInfo && (
-            <div className="col-span-3">
-              <DebugPanel info={debugInfo} />
-            </div>
-          )}
-          {/* Left Panel */}
-          <div>
-            <ScopeBuilder
-              scenarioName={scenarioName}
-              countries={countries}
-              usages={usages}
-              onScenarioNameChange={setScenarioName}
-              onCountriesChange={setCountries}
-              onUsagesChange={setUsages}
-            />
-          </div>
-          
-          {/* Right Panel */}
-          <div className="col-span-2">
-            <IngredientsBuilder
-              ingredients={ingredients}
-              onIngredientsChange={setIngredients}
-            />
-          </div>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'builder' | 'history')}
+          className="space-y-6"
+        >
+          <TabsList>
+            <TabsTrigger value="builder">Validation Builder</TabsTrigger>
+            <TabsTrigger value="history">Ingredients validation results</TabsTrigger>
+          </TabsList>
 
-        </div>
+          <TabsContent value="builder">
+            <div className="grid gap-6 grid-cols-3">
+              {(results.length > 0 || isRunning) && (
+                <div className="col-span-3">
+                  <ResultsTable
+                    data={results}
+                    summary={resultsSummary}
+                    isLoading={isRunning}
+                  />
+                </div>
+              )}
+              {debugInfo && (
+                <div className="col-span-3">
+                  <DebugPanel info={debugInfo} />
+                </div>
+              )}
+              <div>
+                <ScopeBuilder
+                  scenarioName={scenarioName}
+                  countries={countries}
+                  usages={usages}
+                  onScenarioNameChange={setScenarioName}
+                  onCountriesChange={setCountries}
+                  onUsagesChange={setUsages}
+                />
+              </div>
+              
+              <div className="col-span-2">
+                <IngredientsBuilder
+                  ingredients={ingredients}
+                  onIngredientsChange={setIngredients}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <ValidationHistory
+              records={validationHistory}
+              selectedRecordId={selectedHistoryId}
+              onSelectRecord={(id) => setSelectedHistoryId(id)}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
       
       <SettingsDialog
