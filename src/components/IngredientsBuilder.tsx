@@ -84,7 +84,7 @@ export function IngredientsBuilder({
       const duplicate: IngredientInput = {
         ...original,
         id: crypto.randomUUID(),
-        name: `${original.name} (Copy)`,
+        name: `${original.name}`,
       };
       onIngredientsChange([...ingredients, duplicate]);
     }
@@ -170,7 +170,7 @@ export function IngredientsBuilder({
                             {storedIngredients.length > 0 && (
                               <PopoverContent className="p-0 w-80" align="start">
                                 <Command>
-                                  <CommandInput placeholder="Search stored ingredients..." />
+                                  <CommandInput placeholder="Search saved ingredients..." />
                                   <CommandList>
                                     <CommandEmpty>No stored ingredients found.</CommandEmpty>
                                     <CommandGroup>
