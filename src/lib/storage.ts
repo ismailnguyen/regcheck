@@ -1,5 +1,8 @@
 import type { AppSettings, ScenarioInput, IngredientInput } from "@/types";
 
+const API_BASE_URL = import.meta.env.VITE_DECERNIS_API_BASE_URL
+  || (import.meta.env.DEV ? "/decernis-api" : "https://api.decernis.com");
+
 // Local Storage keys
 const STORAGE_KEYS = {
   API_KEY: "regcheck.apiKey",
@@ -9,7 +12,7 @@ const STORAGE_KEYS = {
   DEBUG_MODE: "regcheck.debugMode",
 } as const;
 
-export const DEFAULT_ENDPOINT = "https://api.decernis.com/v5/ingredient-analysis/transaction?report=tabular";
+export const DEFAULT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
 
 // Settings management
 export const getSettings = (): Partial<AppSettings> => {

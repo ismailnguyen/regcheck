@@ -7,7 +7,7 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { DebugPanel } from "@/components/DebugPanel";
 import { getSettings, storeIngredient, DEFAULT_ENDPOINT } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
-import type { Country, Usage, IngredientInput, ReportRow, ResultSummary, DebugInfo } from "@/types";
+import type { Country, Usage, IngredientInput, ReportRow, ResultSummary, DebugInfo, ApiResponse } from "@/types";
 
 const Index = () => {
   // Settings state
@@ -76,92 +76,118 @@ const Index = () => {
       payload: requestPayload,
     };
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (settings.apiKey) {
+      headers.Authorization = `Bearer ${settings.apiKey}`;
+      headers["x-api-key"] = settings.apiKey;
+    }
+    if (settings.orgName) {
+      headers["X-Decernis-Organization"] = settings.orgName;
+    }
+
     setIsRunning(true);
     setDebugInfo(null);
     const requestStartedAt = Date.now();
+    let responseBody: unknown = null;
+    let responseStatus = 0;
+    let responseStatusText = "";
+    let responseWeightBytes: number | undefined;
     
     try {
-      // Mock API call for demo purposes
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate mock results
-      const mockResults: ReportRow[] = [];
-      const statuses = ['ALLOWED', 'PROHIBITED', 'RESTRICTED', 'LISTED'];
-      
-      for (const ingredient of ingredients) {
-        for (const country of countries) {
-          for (const usage of usages) {
-            const status = statuses[Math.floor(Math.random() * statuses.length)];
-            mockResults.push({
-              customerId: ingredient.name,
-              customerName: ingredient.name,
-              idType: ingredient.idType,
-              idValue: ingredient.idValue,
-              decernisId: Math.floor(Math.random() * 100000),
-              decernisName: ingredient.name.toUpperCase(),
-              country,
-              usage,
-              function: "Colorant",
-              resultIndicator: status,
-              threshold: status === 'RESTRICTED' ? '0.1%' : null,
-              citation: `Regulation ${Math.floor(Math.random() * 1000)}/2023`,
-              color: status === 'PROHIBITED' ? '#ef4444' : status === 'RESTRICTED' ? '#f59e0b' : '#10b981',
-              comments: {
-                nameOnList: ingredient.name,
-                functionOnList: "Colorant",
-                usageOnList: usage,
-                comments: `Listed for ${usage} applications`
-              },
-              hyperlink: `https://example.com/regulation/${Math.floor(Math.random() * 1000)}`
-            });
-          }
-        }
-      }
-      
-      // Calculate summary
-      const summary: ResultSummary = {
-        countsByIndicator: {},
-        total: mockResults.length
-      };
-      
-      mockResults.forEach(result => {
-        summary.countsByIndicator[result.resultIndicator] = 
-          (summary.countsByIndicator[result.resultIndicator] || 0) + 1;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestPayload),
       });
 
-      const responseBody = {
-        results: mockResults,
-        summary,
+      responseStatus = response.status;
+      responseStatusText = response.statusText;
+
+      const responseText = await response.text();
+      if (responseText) {
+        responseWeightBytes = typeof TextEncoder !== "undefined"
+          ? new TextEncoder().encode(responseText).length
+          : responseText.length;
+      }
+
+      let parsedBody: unknown = null;
+      if (responseText) {
+        try {
+          parsedBody = JSON.parse(responseText);
+        } catch {
+          parsedBody = null;
+        }
+      }
+
+      responseBody = parsedBody ?? (responseText || null);
+
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}`;
+        if (
+          parsedBody &&
+          typeof parsedBody === "object" &&
+          (parsedBody as { message?: unknown }).message &&
+          typeof (parsedBody as { message?: unknown }).message === "string"
+        ) {
+          message = (parsedBody as { message: string }).message;
+        }
+        throw new Error(message);
+      }
+
+      if (!parsedBody || typeof parsedBody !== "object") {
+        throw new Error("Unexpected API response format");
+      }
+
+      const apiResponse = parsedBody as ApiResponse;
+      const report = apiResponse.ingredientAnalysisReport;
+
+      if (!report || !Array.isArray(report.tabularReport)) {
+        throw new Error("API response missing tabular report data");
+      }
+
+      const normalizedResults: ReportRow[] = report.tabularReport.map((row) => ({
+        ...row,
+        resultIndicator: row.resultIndicator || "UNKNOWN",
+      }));
+
+      const summary: ResultSummary = {
+        countsByIndicator: {},
+        total: normalizedResults.length,
       };
-      const responseJson = JSON.stringify(responseBody);
-      
+
+      normalizedResults.forEach(result => {
+        const indicator = result.resultIndicator || "UNKNOWN";
+        summary.countsByIndicator[indicator] =
+          (summary.countsByIndicator[indicator] || 0) + 1;
+      });
+
       // Store ingredients for future autocomplete
       ingredients.forEach(ingredient => {
         storeIngredient(ingredient);
       });
-      
-      setResults(mockResults);
+
+      setResults(normalizedResults);
       setResultsSummary(summary);
-      
+
       toast({
         title: "Validation Complete",
-        description: `Found ${mockResults.length} results across ${countries.length} countries and ${usages.length} usages.`,
+        description: summary.total > 0
+          ? `Found ${summary.total} results across ${countries.length} countries and ${usages.length} usages.`
+          : "The API call completed successfully but returned no results.",
       });
 
       if (debugEnabled) {
         const durationMs = Date.now() - requestStartedAt;
-        const weightBytes = typeof TextEncoder !== "undefined"
-          ? new TextEncoder().encode(responseJson).length
-          : responseJson.length;
-
         setDebugInfo({
           request: requestInfo,
           response: {
             durationMs,
-            status: 200,
-            statusText: "OK",
-            weightBytes,
-            body: responseBody,
+            status: responseStatus,
+            statusText: responseStatusText,
+            weightBytes: responseWeightBytes,
+            body: responseBody ?? {},
           },
         });
       }
@@ -180,9 +206,10 @@ const Index = () => {
           request: requestInfo,
           response: {
             durationMs,
-            status: 500,
-            statusText: "Error",
-            body: { message: errorMessage },
+            status: responseStatus || 0,
+            statusText: responseStatusText || "Error",
+            weightBytes: responseWeightBytes,
+            body: responseBody ?? { message: errorMessage },
           },
           errorMessage,
         });
