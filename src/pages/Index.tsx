@@ -181,7 +181,6 @@ const Index = () => {
             idValue: ingredient.idValue,
           })),
         },
-        ...(settings.orgName ? { organization: settings.orgName } : {}),
       },
     };
 
@@ -197,9 +196,6 @@ const Index = () => {
     if (settings.apiKey) {
       headers.Authorization = `Bearer ${settings.apiKey}`;
       headers["x-api-key"] = settings.apiKey;
-    }
-    if (settings.orgName) {
-      headers["X-Decernis-Organization"] = settings.orgName;
     }
 
     setIngredientIsRunning(true);
@@ -403,7 +399,6 @@ const Index = () => {
             };
           }),
         },
-        ...(settings.orgName ? { organization: settings.orgName } : {}),
       },
     };
 
@@ -419,9 +414,6 @@ const Index = () => {
     if (settings.apiKey) {
       headers.Authorization = `Bearer ${settings.apiKey}`;
       headers["x-api-key"] = settings.apiKey;
-    }
-    if (settings.orgName) {
-      headers["X-Decernis-Organization"] = settings.orgName;
     }
 
     setRecipeIsRunning(true);

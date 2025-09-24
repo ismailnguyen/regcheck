@@ -12,7 +12,6 @@ const API_BASE_URL = import.meta.env.VITE_DECERNIS_API_BASE_URL
 const STORAGE_KEYS = {
   API_KEY: "regcheck.apiKey",
   ENDPOINT: "regcheck.endpoint",
-  ORG_NAME: "regcheck.orgName",
   SCENARIOS: "regcheck.scenarios",
   DEBUG_MODE: "regcheck.debugMode",
   INGREDIENT_HISTORY: "regcheck.validationHistory",
@@ -39,7 +38,6 @@ export const getSettings = (): Partial<AppSettings> => {
   return {
     apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || "",
     endpoint: localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_INGREDIENT_ENDPOINT,
-    orgName: localStorage.getItem(STORAGE_KEYS.ORG_NAME) || "",
     debugMode: localStorage.getItem(STORAGE_KEYS.DEBUG_MODE) === "true",
   };
 };
@@ -56,14 +54,6 @@ export const saveSettings = (settings: Partial<AppSettings>): void => {
   if (settings.endpoint !== undefined) {
     localStorage.setItem(STORAGE_KEYS.ENDPOINT, settings.endpoint);
   }
-  
-  if (settings.orgName !== undefined) {
-    if (settings.orgName) {
-      localStorage.setItem(STORAGE_KEYS.ORG_NAME, settings.orgName);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.ORG_NAME);
-    }
-  }
 
   if (settings.debugMode !== undefined) {
     localStorage.setItem(STORAGE_KEYS.DEBUG_MODE, settings.debugMode ? "true" : "false");
@@ -72,7 +62,7 @@ export const saveSettings = (settings: Partial<AppSettings>): void => {
 
 export const clearSensitiveData = (): void => {
   localStorage.removeItem(STORAGE_KEYS.API_KEY);
-  localStorage.removeItem(STORAGE_KEYS.ORG_NAME);
+  localStorage.removeItem("regcheck.orgName");
 };
 
 // Validation history management

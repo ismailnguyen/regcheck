@@ -72,7 +72,6 @@ export interface ResultSummary {
 export interface AppSettings {
   apiKey: string;
   endpoint: string;
-  orgName?: string;
   debugMode?: boolean;
 }
 

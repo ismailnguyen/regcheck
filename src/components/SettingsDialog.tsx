@@ -24,7 +24,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [settings, setSettings] = useState<Partial<AppSettings>>({
     apiKey: "",
     endpoint: DEFAULT_ENDPOINT,
-    orgName: "",
     debugMode: false,
   });
   const [showApiKey, setShowApiKey] = useState(false);
@@ -77,7 +76,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             },
           ],
         },
-        ...(settings.orgName ? { organization: settings.orgName } : {}),
       },
     };
 
@@ -86,10 +84,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       Authorization: `Bearer ${settings.apiKey.trim()}`,
       "x-api-key": settings.apiKey.trim(),
     };
-
-    if (settings.orgName?.trim()) {
-      headers["X-Decernis-Organization"] = settings.orgName.trim();
-    }
 
     setIsTesting(true);
     setTestResult(null);
@@ -138,7 +132,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const handleClearData = () => {
     clearSensitiveData();
-    setSettings(prev => ({ ...prev, apiKey: "", orgName: "" }));
+    setSettings(prev => ({ ...prev, apiKey: "" }));
     setTestResult(null);
   };
 
@@ -189,16 +183,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <p className="text-xs text-muted-foreground">
               Default endpoint is pre-configured. Only change if directed by Decernis support.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="org-name">Organization Name (Optional)</Label>
-            <Input
-              id="org-name"
-              placeholder="Enter your organization name..."
-              value={settings.orgName || ""}
-              onChange={(e) => setSettings(prev => ({ ...prev, orgName: e.target.value }))}
-            />
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-3">
