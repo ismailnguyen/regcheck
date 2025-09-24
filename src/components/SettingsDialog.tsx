@@ -9,9 +9,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getSettings, saveSettings, clearSensitiveData, DEFAULT_ENDPOINT } from "@/lib/storage";
+import { getSettings, saveSettings, clearSensitiveData, DEFAULT_INGREDIENT_ENDPOINT } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
 import type { AppSettings } from "@/types";
 
@@ -23,7 +22,6 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [settings, setSettings] = useState<Partial<AppSettings>>({
     apiKey: "",
-    endpoint: DEFAULT_ENDPOINT,
     debugMode: false,
   });
   const [showApiKey, setShowApiKey] = useState(false);
@@ -49,7 +47,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       return;
     }
 
-    const endpoint = settings.endpoint?.trim() || DEFAULT_ENDPOINT;
+    const endpoint = DEFAULT_INGREDIENT_ENDPOINT;
 
     const testPayload = {
       transaction: {
@@ -168,20 +166,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </div>
             <p className="text-xs text-muted-foreground">
               Your API key is stored locally in your browser and never transmitted to our servers.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="endpoint">API Endpoint</Label>
-            <Textarea
-              id="endpoint"
-              rows={3}
-              placeholder="Enter API endpoint URL..."
-              value={settings.endpoint || ""}
-              onChange={(e) => setSettings(prev => ({ ...prev, endpoint: e.target.value }))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Default endpoint is pre-configured. Only change if directed by Decernis support.
             </p>
           </div>
 

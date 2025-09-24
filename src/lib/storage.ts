@@ -11,7 +11,6 @@ const API_BASE_URL = import.meta.env.VITE_DECERNIS_API_BASE_URL
 // Local Storage keys
 const STORAGE_KEYS = {
   API_KEY: "regcheck.apiKey",
-  ENDPOINT: "regcheck.endpoint",
   SCENARIOS: "regcheck.scenarios",
   DEBUG_MODE: "regcheck.debugMode",
   INGREDIENT_HISTORY: "regcheck.validationHistory",
@@ -20,24 +19,10 @@ const STORAGE_KEYS = {
 
 export const DEFAULT_INGREDIENT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
 export const DEFAULT_RECIPE_ENDPOINT = `${API_BASE_URL}/v5/recipe-analysis/transaction?report=tabular`;
-export const DEFAULT_ENDPOINT = DEFAULT_INGREDIENT_ENDPOINT;
-
-export const deriveRecipeEndpoint = (ingredientEndpoint?: string): string => {
-  if (!ingredientEndpoint) return DEFAULT_RECIPE_ENDPOINT;
-  try {
-    const url = new URL(ingredientEndpoint);
-    url.pathname = url.pathname.replace("ingredient-analysis", "recipe-analysis");
-    return `${url.origin}${url.pathname}${url.search || ""}`;
-  } catch {
-    return ingredientEndpoint.replace("ingredient-analysis", "recipe-analysis");
-  }
-};
-
 // Settings management
 export const getSettings = (): Partial<AppSettings> => {
   return {
     apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || "",
-    endpoint: localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_INGREDIENT_ENDPOINT,
     debugMode: localStorage.getItem(STORAGE_KEYS.DEBUG_MODE) === "true",
   };
 };
@@ -49,10 +34,6 @@ export const saveSettings = (settings: Partial<AppSettings>): void => {
     } else {
       localStorage.removeItem(STORAGE_KEYS.API_KEY);
     }
-  }
-  
-  if (settings.endpoint !== undefined) {
-    localStorage.setItem(STORAGE_KEYS.ENDPOINT, settings.endpoint);
   }
 
   if (settings.debugMode !== undefined) {

@@ -12,7 +12,6 @@ import {
   storeIngredient,
   DEFAULT_INGREDIENT_ENDPOINT,
   DEFAULT_RECIPE_ENDPOINT,
-  deriveRecipeEndpoint,
   getIngredientValidationHistory,
   saveIngredientValidationResult,
   getRecipeValidationHistory,
@@ -155,7 +154,7 @@ const Index = () => {
       return;
     }
 
-    const endpoint = settings.endpoint || DEFAULT_INGREDIENT_ENDPOINT;
+    const endpoint = DEFAULT_INGREDIENT_ENDPOINT;
     const debugEnabled = Boolean(settings.debugMode);
 
     const requestPayload = {
@@ -362,8 +361,7 @@ const Index = () => {
       return;
     }
 
-    const derivedEndpoint = deriveRecipeEndpoint(settings.endpoint || DEFAULT_INGREDIENT_ENDPOINT);
-    const endpoint = derivedEndpoint || DEFAULT_RECIPE_ENDPOINT;
+    const endpoint = DEFAULT_RECIPE_ENDPOINT;
     const debugEnabled = Boolean(settings.debugMode);
 
     const recipeName = recipeScenarioName || "Untitled Recipe";
