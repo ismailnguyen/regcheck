@@ -41,6 +41,7 @@ interface ColumnDefinition {
 
 const BASE_TABLE_COLUMNS: ColumnDefinition[] = [
   { key: 'customerName', label: 'Ingredient Name', filterable: true },
+  { key: 'spec', label: 'Spec', filterable: true },
   { key: 'country', label: 'Country', filterable: true },
   { key: 'usage', label: 'Usage', filterable: true },
   { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
@@ -79,7 +80,6 @@ const resolveIngredientName = (row: ReportRow): string => {
   return (
     pickFirstValue(
       rowWithOptionalName.name,
-      row.spec,
       row.customerName,
       row.decernisName,
       row.customerId,
