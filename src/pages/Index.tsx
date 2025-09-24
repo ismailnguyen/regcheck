@@ -689,7 +689,7 @@ const Index = () => {
         onModeChange={setActiveMode}
       />
       
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto px-0 py-6">
         <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
             <TabsTrigger value={TAB_BUILDER}>Validation Builder</TabsTrigger>
