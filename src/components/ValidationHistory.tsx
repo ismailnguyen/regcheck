@@ -45,6 +45,9 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
 
   const selectedRecord = orderedRecords.find(record => record.id === selectedRecordId) || orderedRecords[0];
   const selectedMetrics = selectedRecord?.metrics;
+  const showPercentageColumn = selectedRecord?.scenario.ingredients.some(
+    (ingredient) => typeof ingredient.percentage === 'number' && Number.isFinite(ingredient.percentage),
+  ) ?? false;
 
   if (orderedRecords.length === 0) {
     return (
@@ -155,7 +158,11 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
               </div>
             </div>
 
-            <ResultsTable data={selectedRecord.results} summary={selectedRecord.summary} />
+            <ResultsTable
+              data={selectedRecord.results}
+              summary={selectedRecord.summary}
+              showPercentage={showPercentageColumn}
+            />
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-lg border bg-card py-12 text-muted-foreground">

@@ -1435,6 +1435,7 @@ const Index = () => {
                     summary={currentSummary}
                     isLoading={currentIsRunning}
                     title={currentResultsTitle}
+                    showPercentage={activeMode === "recipe"}
                   />
                 </div>
               )}

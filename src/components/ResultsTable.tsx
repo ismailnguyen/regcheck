@@ -26,6 +26,7 @@ interface ResultsTableProps {
   summary?: ResultSummary;
   isLoading?: boolean;
   title?: string;
+  showPercentage?: boolean;
 }
 
 type SortField = keyof ReportRow;
@@ -35,28 +36,43 @@ interface ColumnDefinition {
   key: keyof ReportRow;
   label: string;
   filterable: boolean;
+  cellClassName?: string;
 }
 
-const TABLE_COLUMNS: ColumnDefinition[] = [
+const BASE_TABLE_COLUMNS: ColumnDefinition[] = [
   { key: 'customerName', label: 'Ingredient Name', filterable: true },
   { key: 'country', label: 'Country', filterable: true },
   { key: 'usage', label: 'Usage', filterable: true },
   { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
   { key: 'threshold', label: 'Restriction Level', filterable: true },
   { key: 'regulation', label: 'Regulation', filterable: true },
-  { key: 'citation', label: 'Legal Quote', filterable: true },
+  { key: 'citation', label: 'Legal Quote', filterable: true, cellClassName: 'max-w-xs truncate' },
   { key: 'idType', label: 'ID Type', filterable: true },
   { key: 'idValue', label: 'ID Value', filterable: true },
   { key: 'decernisName', label: 'Decernis Name', filterable: true },
   { key: 'function', label: 'Function', filterable: true },
 ];
 
-export function ResultsTable({ data, summary, isLoading, title }: ResultsTableProps) {
+const PERCENTAGE_COLUMN: ColumnDefinition = {
+  key: 'percentage',
+  label: 'Percentage',
+  filterable: false,
+};
+
+export function ResultsTable({ data, summary, isLoading, title, showPercentage }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [pageSize, setPageSize] = useState<number | 'all'>(50);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const columns = useMemo(() => {
+    const base = [...BASE_TABLE_COLUMNS];
+    if (showPercentage) {
+      base.splice(0, 0, PERCENTAGE_COLUMN);
+    }
+    return base;
+  }, [showPercentage]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -80,10 +96,22 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
   };
 
   const filteredAndSortedData = useMemo(() => {
+    const visibleColumnKeys = new Set(columns.map(column => column.key));
+
     const filtered = data.filter(row => {
-      return Object.entries(filters).every(([column, filterValue]) => {
-        if (!filterValue) return true;
-        const cellValue = String(row[column as keyof ReportRow] || '').toLowerCase();
+      return Object.entries(filters).every(([columnKey, filterValue]) => {
+        if (!filterValue) {
+          return true;
+        }
+
+        if (!visibleColumnKeys.has(columnKey as keyof ReportRow)) {
+          return true;
+        }
+
+        const rawValue = row[columnKey as keyof ReportRow];
+        const cellValue = rawValue === undefined || rawValue === null
+          ? ''
+          : String(rawValue).toLowerCase();
         return cellValue.includes(filterValue.toLowerCase());
       });
     });
@@ -98,11 +126,11 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
     }
 
     return filtered;
-  }, [data, filters, sortField, sortDirection]);
+  }, [columns, data, filters, sortField, sortDirection]);
 
   const filterSuggestions = useMemo(() => {
     const suggestions: Record<string, string[]> = {};
-    TABLE_COLUMNS.forEach((column) => {
+    columns.forEach((column) => {
       if (!column.filterable) {
         return;
       }
@@ -120,7 +148,7 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
       suggestions[column.key] = Array.from(values).sort((a, b) => a.localeCompare(b));
     });
     return suggestions;
-  }, [data]);
+  }, [columns, data]);
 
   const paginatedData = useMemo(() => {
     if (pageSize === 'all') {
@@ -163,6 +191,93 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
         {status}
       </Badge>
     );
+  };
+
+  const pickFirstValue = (...values: Array<unknown>): string | null => {
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value.toString();
+      }
+    }
+    return null;
+  };
+
+  const formatTextValue = (value: unknown): string => {
+    if (value === null || value === undefined) {
+      return '–';
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed || '–';
+    }
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value.toString() : '–';
+    }
+    return String(value);
+  };
+
+  const toTrimmedNumberString = (num: number): string => {
+    if (!Number.isFinite(num)) {
+      return '';
+    }
+    return Number(num.toFixed(4)).toString();
+  };
+
+  const formatPercentageValue = (value: ReportRow['percentage']): string => {
+    if (value === null || value === undefined) {
+      return '–';
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? `${toTrimmedNumberString(value)}%` : '–';
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return '–';
+      }
+      if (trimmed.includes('%')) {
+        return trimmed;
+      }
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) {
+        return `${toTrimmedNumberString(numeric)}%`;
+      }
+      return trimmed;
+    }
+
+    return '–';
+  };
+
+  const renderCellContent = (columnKey: keyof ReportRow, row: ReportRow) => {
+    if (columnKey === 'customerName') {
+      const rowWithOptionalName = row as ReportRow & { name?: string | null };
+      return pickFirstValue(
+        rowWithOptionalName.name,
+        row.spec,
+        row.customerName,
+        row.decernisName,
+        row.customerId,
+        row.idValue,
+      ) ?? '–';
+    }
+
+    if (columnKey === 'resultIndicator') {
+      return getStatusBadge(row.resultIndicator);
+    }
+
+    if (columnKey === 'percentage') {
+      return formatPercentageValue(row.percentage);
+    }
+
+    return formatTextValue(row[columnKey]);
   };
 
   if (isLoading) {
@@ -235,7 +350,7 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
             <Table>
               <TableHeader>
                 <TableRow>
-                  {TABLE_COLUMNS.map(column => (
+                  {columns.map(column => (
                     <TableHead key={column.key} className="relative">
                       <div className="space-y-2">
                         <Button
@@ -271,20 +386,33 @@ export function ResultsTable({ data, summary, isLoading, title }: ResultsTablePr
               </TableHeader>
               <TableBody>
                 {paginatedData.map((row, index) => {
-                  const ingredientName = row.name || row.spec || row.customerName || '–';
                   return (
                     <TableRow key={`${row.customerId}-${row.country}-${row.usage}-${index}`}>
-                      <TableCell className="font-medium">{ingredientName}</TableCell>
-                      <TableCell>{row.country || '–'}</TableCell>
-                      <TableCell>{row.usage || '–'}</TableCell>
-                      <TableCell>{getStatusBadge(row.resultIndicator)}</TableCell>
-                      <TableCell>{row.threshold || '–'}</TableCell>
-                      <TableCell>{row.regulation || '–'}</TableCell>
-                      <TableCell className="max-w-xs truncate" title={row.citation || ''}>{row.citation || '–'}</TableCell>
-                      <TableCell>{row.idType || '–'}</TableCell>
-                      <TableCell>{row.idValue || '–'}</TableCell>
-                      <TableCell>{row.decernisName || '–'}</TableCell>
-                      <TableCell>{row.function || '–'}</TableCell>
+                      {columns.map((column) => {
+                        const derivedClassName = [
+                          column.cellClassName,
+                          column.key === 'customerName' ? 'font-medium' : null,
+                        ].filter(Boolean).join(' ');
+
+                        const cellProps: {
+                          className?: string;
+                          title?: string;
+                        } = {};
+
+                        if (derivedClassName) {
+                          cellProps.className = derivedClassName;
+                        }
+
+                        if (column.key === 'citation' && typeof row.citation === 'string' && row.citation.trim()) {
+                          cellProps.title = row.citation;
+                        }
+
+                        return (
+                          <TableCell key={column.key} {...cellProps}>
+                            {renderCellContent(column.key, row)}
+                          </TableCell>
+                        );
+                      })}
                       <TableCell>
                         {row.hyperlink && (
                           <Button variant="ghost" size="sm" asChild>
