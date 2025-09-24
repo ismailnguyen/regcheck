@@ -47,6 +47,10 @@ export interface ReportRow {
   color?: string | null;
   comments?: ResultComments | null;
   hyperlink?: string | null;
+  percentage?: string | number | null;
+  spec?: string | null;
+  regulation?: string | null;
+  otherIdentifiers?: Record<string, string> | null;
 }
 
 export interface IngredientAnalysisReport {
@@ -72,11 +76,18 @@ export interface AppSettings {
   debugMode?: boolean;
 }
 
+export type ValidationScenarioIngredient = IngredientInput & {
+  percentage?: number;
+  function?: string;
+  spec?: string;
+};
+
 export interface ValidationScenarioSnapshot {
   name?: string;
   countries: Country[];
   usages: Usage[];
-  ingredients: IngredientInput[];
+  ingredients: ValidationScenarioIngredient[];
+  spec?: string;
 }
 
 export interface ValidationResultRecord {
@@ -106,6 +117,12 @@ export interface DebugInfo {
   request: DebugRequestInfo;
   response: DebugResponseInfo;
   errorMessage?: string;
+}
+
+export interface RecipeIngredientInput extends IngredientInput {
+  percentage: number;
+  function?: string;
+  spec?: string;
 }
 
 // Built-in data constants

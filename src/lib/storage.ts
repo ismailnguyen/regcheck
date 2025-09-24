@@ -15,16 +15,30 @@ const STORAGE_KEYS = {
   ORG_NAME: "regcheck.orgName",
   SCENARIOS: "regcheck.scenarios",
   DEBUG_MODE: "regcheck.debugMode",
-  VALIDATION_HISTORY: "regcheck.validationHistory",
+  INGREDIENT_HISTORY: "regcheck.validationHistory",
+  RECIPE_HISTORY: "regcheck.recipeHistory",
 } as const;
 
-export const DEFAULT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
+export const DEFAULT_INGREDIENT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
+export const DEFAULT_RECIPE_ENDPOINT = `${API_BASE_URL}/v5/recipe-analysis/transaction?report=tabular`;
+export const DEFAULT_ENDPOINT = DEFAULT_INGREDIENT_ENDPOINT;
+
+export const deriveRecipeEndpoint = (ingredientEndpoint?: string): string => {
+  if (!ingredientEndpoint) return DEFAULT_RECIPE_ENDPOINT;
+  try {
+    const url = new URL(ingredientEndpoint);
+    url.pathname = url.pathname.replace("ingredient-analysis", "recipe-analysis");
+    return `${url.origin}${url.pathname}${url.search || ""}`;
+  } catch {
+    return ingredientEndpoint.replace("ingredient-analysis", "recipe-analysis");
+  }
+};
 
 // Settings management
 export const getSettings = (): Partial<AppSettings> => {
   return {
     apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || "",
-    endpoint: localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_ENDPOINT,
+    endpoint: localStorage.getItem(STORAGE_KEYS.ENDPOINT) || DEFAULT_INGREDIENT_ENDPOINT,
     orgName: localStorage.getItem(STORAGE_KEYS.ORG_NAME) || "",
     debugMode: localStorage.getItem(STORAGE_KEYS.DEBUG_MODE) === "true",
   };
@@ -62,19 +76,34 @@ export const clearSensitiveData = (): void => {
 };
 
 // Validation history management
-export const getValidationHistory = (): ValidationResultRecord[] => {
+export const getIngredientValidationHistory = (): ValidationResultRecord[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEYS.VALIDATION_HISTORY);
+    const stored = localStorage.getItem(STORAGE_KEYS.INGREDIENT_HISTORY);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
   }
 };
 
-export const saveValidationResult = (record: ValidationResultRecord): void => {
-  const history = getValidationHistory();
+export const saveIngredientValidationResult = (record: ValidationResultRecord): void => {
+  const history = getIngredientValidationHistory();
   history.unshift(record);
-  localStorage.setItem(STORAGE_KEYS.VALIDATION_HISTORY, JSON.stringify(history));
+  localStorage.setItem(STORAGE_KEYS.INGREDIENT_HISTORY, JSON.stringify(history));
+};
+
+export const getRecipeValidationHistory = (): ValidationResultRecord[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.RECIPE_HISTORY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveRecipeValidationResult = (record: ValidationResultRecord): void => {
+  const history = getRecipeValidationHistory();
+  history.unshift(record);
+  localStorage.setItem(STORAGE_KEYS.RECIPE_HISTORY, JSON.stringify(history));
 };
 
 // Scenarios management

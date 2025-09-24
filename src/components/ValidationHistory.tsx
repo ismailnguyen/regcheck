@@ -10,6 +10,7 @@ interface ValidationHistoryProps {
   records: ValidationResultRecord[];
   selectedRecordId: string | null;
   onSelectRecord: (id: string) => void;
+  title?: string;
 }
 
 const formatDate = (iso: string): string => {
@@ -20,7 +21,7 @@ const formatDate = (iso: string): string => {
   }
 };
 
-export function ValidationHistory({ records, selectedRecordId, onSelectRecord }: ValidationHistoryProps) {
+export function ValidationHistory({ records, selectedRecordId, onSelectRecord, title = "Validation Results" }: ValidationHistoryProps) {
   const orderedRecords = useMemo(() => {
     return [...records].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }, [records]);
@@ -30,7 +31,7 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord }:
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ingredients Validation Results</CardTitle>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {orderedRecords.length === 0 ? (
@@ -79,19 +80,27 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord }:
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    <p>
-                      Countries: {selectedRecord.scenario.countries.length > 0
-                        ? selectedRecord.scenario.countries.join(", ")
-                        : "None"}
-                    </p>
-                    <p>
-                      Usages: {selectedRecord.scenario.usages.length > 0
-                        ? selectedRecord.scenario.usages.join(", ")
-                        : "None"}
-                    </p>
+                    {selectedRecord.scenario.countries.length > 0 && (
+                      <p>Countries: {selectedRecord.scenario.countries.join(", ")}</p>
+                    )}
+                    {selectedRecord.scenario.usages.length > 0 && (
+                      <p>Usages: {selectedRecord.scenario.usages.join(", ")}</p>
+                    )}
+                    {selectedRecord.scenario.spec && (
+                      <p>Specification: {selectedRecord.scenario.spec}</p>
+                    )}
                     <p>
                       Ingredients: {selectedRecord.scenario.ingredients.length > 0
-                        ? selectedRecord.scenario.ingredients.map((ing) => ing.name || ing.idValue || "Unnamed").join(", ")
+                        ? selectedRecord.scenario.ingredients.map((ing) => {
+                            const parts = [ing.name || ing.idValue || "Unnamed"];
+                            if (typeof ing.percentage === "number") {
+                              parts.push(`${ing.percentage}%`);
+                            }
+                            if (ing.function) {
+                              parts.push(ing.function);
+                            }
+                            return parts.join(" • ");
+                          }).join(", ")
                         : "None"}
                     </p>
                   </div>

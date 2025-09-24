@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RegCheckHeader } from "@/components/RegCheckHeader";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { IngredientsBuilder } from "@/components/IngredientsBuilder";
+import { RecipeBuilder } from "@/components/RecipeBuilder";
 import { ResultsTable } from "@/components/ResultsTable";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { DebugPanel } from "@/components/DebugPanel";
@@ -9,54 +10,116 @@ import { ValidationHistory } from "@/components/ValidationHistory";
 import {
   getSettings,
   storeIngredient,
-  DEFAULT_ENDPOINT,
-  getValidationHistory,
-  saveValidationResult,
+  DEFAULT_INGREDIENT_ENDPOINT,
+  DEFAULT_RECIPE_ENDPOINT,
+  deriveRecipeEndpoint,
+  getIngredientValidationHistory,
+  saveIngredientValidationResult,
+  getRecipeValidationHistory,
+  saveRecipeValidationResult,
 } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import type {
   Country,
   Usage,
   IngredientInput,
+  RecipeIngredientInput,
   ReportRow,
   ResultSummary,
   DebugInfo,
   ApiResponse,
   ValidationResultRecord,
+  IdType,
 } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const TAB_BUILDER = "builder" as const;
+const TAB_HISTORY = "history" as const;
+
+type Mode = "ingredients" | "recipe";
+type TabValue = typeof TAB_BUILDER | typeof TAB_HISTORY;
+
+const isValidIdValue = (idType: IdType, value: string): boolean => {
+  if (!value.trim()) return false;
+  if (idType === "INCI name") return value.trim().length > 0;
+  return /^[0-9]+$/.test(value.trim());
+};
+
 const Index = () => {
-  // Settings state
+  const [activeMode, setActiveMode] = useState<Mode>("ingredients");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  
-  // Scenario state
-  const [scenarioName, setScenarioName] = useState("");
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [usages, setUsages] = useState<Usage[]>([]);
-  const [ingredients, setIngredients] = useState<IngredientInput[]>([]);
-  
-  // Results state
-  const [results, setResults] = useState<ReportRow[]>([]);
-  const [resultsSummary, setResultsSummary] = useState<ResultSummary>();
-  const [isRunning, setIsRunning] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const [validationHistory, setValidationHistory] = useState<ValidationResultRecord[]>([]);
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'builder' | 'history'>('builder');
+
+  // Ingredient builder state
+  const [ingredientScenarioName, setIngredientScenarioName] = useState("");
+  const [ingredientCountries, setIngredientCountries] = useState<Country[]>([]);
+  const [ingredientUsages, setIngredientUsages] = useState<Usage[]>([]);
+  const [ingredientItems, setIngredientItems] = useState<IngredientInput[]>([]);
+
+  const [ingredientResults, setIngredientResults] = useState<ReportRow[]>([]);
+  const [ingredientSummary, setIngredientSummary] = useState<ResultSummary>();
+  const [ingredientIsRunning, setIngredientIsRunning] = useState(false);
+  const [ingredientDebugInfo, setIngredientDebugInfo] = useState<DebugInfo | null>(null);
+  const [ingredientHistory, setIngredientHistory] = useState<ValidationResultRecord[]>([]);
+  const [selectedIngredientHistoryId, setSelectedIngredientHistoryId] = useState<string | null>(null);
+  const [ingredientTab, setIngredientTab] = useState<TabValue>(TAB_BUILDER);
+
+  // Recipe builder state
+  const [recipeScenarioName, setRecipeScenarioName] = useState("");
+  const [recipeCountries, setRecipeCountries] = useState<Country[]>([]);
+  const [recipeUsages, setRecipeUsages] = useState<Usage[]>([]);
+  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientInput[]>([]);
+  const [recipeSpec, setRecipeSpec] = useState("");
+
+  const [recipeResults, setRecipeResults] = useState<ReportRow[]>([]);
+  const [recipeSummary, setRecipeSummary] = useState<ResultSummary>();
+  const [recipeIsRunning, setRecipeIsRunning] = useState(false);
+  const [recipeDebugInfo, setRecipeDebugInfo] = useState<DebugInfo | null>(null);
+  const [recipeHistory, setRecipeHistory] = useState<ValidationResultRecord[]>([]);
+  const [selectedRecipeHistoryId, setSelectedRecipeHistoryId] = useState<string | null>(null);
+  const [recipeTab, setRecipeTab] = useState<TabValue>(TAB_BUILDER);
 
   useEffect(() => {
-    const history = getValidationHistory();
-    setValidationHistory(history);
-    if (history.length > 0) {
-      setSelectedHistoryId(history[0].id);
+    const ingredientHistoryData = getIngredientValidationHistory();
+    setIngredientHistory(ingredientHistoryData);
+    if (ingredientHistoryData.length > 0) {
+      setSelectedIngredientHistoryId(ingredientHistoryData[0].id);
+    }
+
+    const recipeHistoryData = getRecipeValidationHistory();
+    setRecipeHistory(recipeHistoryData);
+    if (recipeHistoryData.length > 0) {
+      setSelectedRecipeHistoryId(recipeHistoryData[0].id);
     }
   }, []);
 
-  const canRun = countries.length > 0 && usages.length > 0 && ingredients.length > 0 && 
-    ingredients.every(ing => ing.name.trim() && ing.idValue.trim());
+  const ingredientCanRun =
+    ingredientCountries.length > 0 &&
+    ingredientUsages.length > 0 &&
+    ingredientItems.length > 0 &&
+    ingredientItems.every((ing) => ing.name.trim() && ing.idValue.trim());
 
-  const handleRunValidation = async () => {
+  const recipeTotalPercentage = useMemo(
+    () => recipeIngredients.reduce((total, ing) => total + (Number.isFinite(ing.percentage) ? ing.percentage : 0), 0),
+    [recipeIngredients]
+  );
+
+  const recipeInputsValid = recipeIngredients.every((ing) =>
+    ing.name.trim() &&
+    ing.idValue.trim() &&
+    isValidIdValue(ing.idType, ing.idValue) &&
+    Number.isFinite(ing.percentage) &&
+    ing.percentage > 0
+  );
+
+  const recipeCanRun =
+    recipeCountries.length > 0 &&
+    recipeUsages.length > 0 &&
+    recipeIngredients.length > 0 &&
+    recipeInputsValid &&
+    recipeTotalPercentage > 0 &&
+    recipeTotalPercentage <= 100;
+
+  const runIngredientValidation = async () => {
     const settings = getSettings();
     if (!settings.apiKey) {
       toast({
@@ -68,26 +131,26 @@ const Index = () => {
       return;
     }
 
-    const endpoint = settings.endpoint || DEFAULT_ENDPOINT;
+    const endpoint = settings.endpoint || DEFAULT_INGREDIENT_ENDPOINT;
     const debugEnabled = Boolean(settings.debugMode);
 
     const requestPayload = {
       transaction: {
         scope: {
-          name: scenarioName || "Untitled Scenario",
-          country: countries,
+          name: ingredientScenarioName || "Untitled Scenario",
+          country: ingredientCountries,
           topic: [
             {
               name: "COS",
               scopeDetail: {
-                usage: usages,
+                usage: ingredientUsages,
               },
             },
           ],
         },
         ingredientList: {
-          name: scenarioName ? `${scenarioName} Ingredients` : "Submitted Ingredients",
-          list: ingredients.map((ingredient) => ({
+          name: ingredientScenarioName ? `${ingredientScenarioName} Ingredients` : "Submitted Ingredients",
+          list: ingredientItems.map((ingredient) => ({
             customerId: ingredient.name,
             customerName: ingredient.name,
             idType: ingredient.idType,
@@ -115,14 +178,14 @@ const Index = () => {
       headers["X-Decernis-Organization"] = settings.orgName;
     }
 
-    setIsRunning(true);
-    setDebugInfo(null);
+    setIngredientIsRunning(true);
+    setIngredientDebugInfo(null);
     const requestStartedAt = Date.now();
     let responseBody: unknown = null;
     let responseStatus = 0;
     let responseStatusText = "";
     let responseWeightBytes: number | undefined;
-    
+
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -191,22 +254,21 @@ const Index = () => {
           (summary.countsByIndicator[indicator] || 0) + 1;
       });
 
-      // Store ingredients for future autocomplete
-      ingredients.forEach(ingredient => {
+      ingredientItems.forEach(ingredient => {
         storeIngredient(ingredient);
       });
 
-      setResults(normalizedResults);
-      setResultsSummary(summary);
+      setIngredientResults(normalizedResults);
+      setIngredientSummary(summary);
 
       toast({
         title: "Validation Complete",
         description: summary.total > 0
-          ? `Found ${summary.total} results across ${countries.length} countries and ${usages.length} usages.`
+          ? `Found ${summary.total} results across ${ingredientCountries.length} countries and ${ingredientUsages.length} usages.`
           : "The API call completed successfully but returned no results.",
       });
 
-      const recordName = scenarioName.trim() || `Scenario ${new Date().toLocaleString()}`;
+      const recordName = ingredientScenarioName.trim() || `Scenario ${new Date().toLocaleString()}`;
       const record: ValidationResultRecord = {
         id: crypto.randomUUID(),
         name: recordName,
@@ -217,20 +279,20 @@ const Index = () => {
         },
         results: normalizedResults,
         scenario: {
-          name: scenarioName.trim() || undefined,
-          countries: [...countries],
-          usages: [...usages],
-          ingredients: ingredients.map((ingredient) => ({ ...ingredient })),
+          name: ingredientScenarioName.trim() || undefined,
+          countries: [...ingredientCountries],
+          usages: [...ingredientUsages],
+          ingredients: ingredientItems.map((ingredient) => ({ ...ingredient })),
         },
       };
 
-      saveValidationResult(record);
-      setValidationHistory(prev => [record, ...prev]);
-      setSelectedHistoryId(record.id);
+      saveIngredientValidationResult(record);
+      setIngredientHistory(prev => [record, ...prev]);
+      setSelectedIngredientHistoryId(record.id);
 
       if (debugEnabled) {
         const durationMs = Date.now() - requestStartedAt;
-        setDebugInfo({
+        setIngredientDebugInfo({
           request: requestInfo,
           response: {
             durationMs,
@@ -241,7 +303,6 @@ const Index = () => {
           },
         });
       }
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
@@ -252,7 +313,7 @@ const Index = () => {
 
       if (debugEnabled) {
         const durationMs = Date.now() - requestStartedAt;
-        setDebugInfo({
+        setIngredientDebugInfo({
           request: requestInfo,
           response: {
             durationMs,
@@ -265,87 +326,377 @@ const Index = () => {
         });
       }
     } finally {
-      setIsRunning(false);
+      setIngredientIsRunning(false);
     }
   };
 
-  const handleSaveScenario = () => {
-    toast({
-      title: "Scenario Saved",
-      description: "Your scenario has been saved locally.",
-    });
+  const runRecipeValidation = async () => {
+    const settings = getSettings();
+    if (!settings.apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please configure your API key in settings before running validation.",
+        variant: "destructive",
+      });
+      setSettingsOpen(true);
+      return;
+    }
+
+    const derivedEndpoint = deriveRecipeEndpoint(settings.endpoint || DEFAULT_INGREDIENT_ENDPOINT);
+    const endpoint = derivedEndpoint || DEFAULT_RECIPE_ENDPOINT;
+    const debugEnabled = Boolean(settings.debugMode);
+
+    const recipeName = recipeScenarioName || "Untitled Recipe";
+    const recipeSpecValue = recipeSpec.trim() || recipeName;
+
+    const requestPayload = {
+      transaction: {
+        scope: {
+          name: recipeName,
+          country: recipeCountries,
+          topic: [
+            {
+              name: "COS",
+              scopeDetail: {
+                usage: recipeUsages,
+              },
+            },
+          ],
+        },
+        recipe: {
+          name: recipeName,
+          spec: recipeSpecValue,
+          ingredients: recipeIngredients.map((ingredient) => {
+            const trimmedFunction = ingredient.function?.trim();
+            const trimmedSpec = ingredient.spec?.trim();
+            return {
+              idType: ingredient.idType,
+              idValue: ingredient.idValue,
+              name: ingredient.name,
+              percentage: ingredient.percentage,
+              ...(trimmedFunction ? { function: trimmedFunction } : {}),
+              ...(trimmedSpec ? { spec: trimmedSpec } : {}),
+            };
+          }),
+        },
+        ...(settings.orgName ? { organization: settings.orgName } : {}),
+      },
+    };
+
+    const requestInfo = {
+      method: "POST",
+      url: endpoint,
+      payload: requestPayload,
+    };
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (settings.apiKey) {
+      headers.Authorization = `Bearer ${settings.apiKey}`;
+      headers["x-api-key"] = settings.apiKey;
+    }
+    if (settings.orgName) {
+      headers["X-Decernis-Organization"] = settings.orgName;
+    }
+
+    setRecipeIsRunning(true);
+    setRecipeDebugInfo(null);
+    const requestStartedAt = Date.now();
+    let responseBody: unknown = null;
+    let responseStatus = 0;
+    let responseStatusText = "";
+    let responseWeightBytes: number | undefined;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestPayload),
+      });
+
+      responseStatus = response.status;
+      responseStatusText = response.statusText;
+
+      const responseText = await response.text();
+      if (responseText) {
+        responseWeightBytes = typeof TextEncoder !== "undefined"
+          ? new TextEncoder().encode(responseText).length
+          : responseText.length;
+      }
+
+      let parsedBody: unknown = null;
+      if (responseText) {
+        try {
+          parsedBody = JSON.parse(responseText);
+        } catch {
+          parsedBody = null;
+        }
+      }
+
+      responseBody = parsedBody ?? (responseText || null);
+
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}`;
+        if (
+          parsedBody &&
+          typeof parsedBody === "object" &&
+          (parsedBody as { message?: unknown }).message &&
+          typeof (parsedBody as { message?: unknown }).message === "string"
+        ) {
+          message = (parsedBody as { message: string }).message;
+        }
+        throw new Error(message);
+      }
+
+      if (!parsedBody || typeof parsedBody !== "object") {
+        throw new Error("Unexpected API response format");
+      }
+
+      const apiResponse = parsedBody as ApiResponse & {
+        recipeAnalaysisReport?: {
+          recipeReport?: Array<{
+            country?: string;
+            resultIndicator?: string;
+            tabularReport?: ReportRow[];
+          }>;
+        };
+      } & {
+        recipeAnalysisReport?: {
+          recipeReport?: Array<{
+            country?: string;
+            resultIndicator?: string;
+            tabularReport?: ReportRow[];
+          }>;
+        };
+      };
+
+      const recipeReportContainer = apiResponse.recipeAnalaysisReport || apiResponse.recipeAnalysisReport;
+      let normalizedResults: ReportRow[] = [];
+
+      if (recipeReportContainer?.recipeReport && Array.isArray(recipeReportContainer.recipeReport)) {
+        normalizedResults = recipeReportContainer.recipeReport.flatMap((entry) => {
+          const entryCountry = entry.country || "";
+          const entryIndicator = entry.resultIndicator;
+          const tabular = Array.isArray(entry.tabularReport) ? entry.tabularReport : [];
+          return tabular.map((row) => ({
+            ...row,
+            country: row.country || entryCountry,
+            resultIndicator: row.resultIndicator || entryIndicator || "UNKNOWN",
+          }));
+        });
+      }
+
+      if (normalizedResults.length === 0 && apiResponse.ingredientAnalysisReport?.tabularReport) {
+        normalizedResults = apiResponse.ingredientAnalysisReport.tabularReport.map((row) => ({
+          ...row,
+          resultIndicator: row.resultIndicator || "UNKNOWN",
+        }));
+      }
+
+      if (normalizedResults.length === 0) {
+        throw new Error("API response missing recipe report data");
+      }
+
+      const summary: ResultSummary = {
+        countsByIndicator: {},
+        total: normalizedResults.length,
+      };
+
+      normalizedResults.forEach(result => {
+        const indicator = result.resultIndicator || "UNKNOWN";
+        summary.countsByIndicator[indicator] =
+          (summary.countsByIndicator[indicator] || 0) + 1;
+      });
+
+      recipeIngredients.forEach(({ percentage: _percentage, function: _function, spec: _spec, ...base }) => {
+        storeIngredient(base);
+      });
+
+      setRecipeResults(normalizedResults);
+      setRecipeSummary(summary);
+
+      toast({
+        title: "Recipe Validation Complete",
+        description: summary.total > 0
+          ? `Found ${summary.total} results across ${recipeCountries.length} countries and ${recipeUsages.length} usages.`
+          : "The API call completed successfully but returned no results.",
+      });
+
+      const recordName = recipeScenarioName.trim() || `Recipe ${new Date().toLocaleString()}`;
+      const record: ValidationResultRecord = {
+        id: crypto.randomUUID(),
+        name: recordName,
+        createdAt: new Date().toISOString(),
+        summary: {
+          countsByIndicator: { ...summary.countsByIndicator },
+          total: summary.total,
+        },
+        results: normalizedResults,
+        scenario: {
+          name: recipeScenarioName.trim() || undefined,
+          countries: [...recipeCountries],
+          usages: [...recipeUsages],
+          ingredients: recipeIngredients.map((ingredient) => ({ ...ingredient })),
+          spec: recipeSpecValue,
+        },
+      };
+
+      saveRecipeValidationResult(record);
+      setRecipeHistory(prev => [record, ...prev]);
+      setSelectedRecipeHistoryId(record.id);
+
+      if (debugEnabled) {
+        const durationMs = Date.now() - requestStartedAt;
+        setRecipeDebugInfo({
+          request: requestInfo,
+          response: {
+            durationMs,
+            status: responseStatus,
+            statusText: responseStatusText,
+            weightBytes: responseWeightBytes,
+            body: responseBody ?? {},
+          },
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast({
+        title: "Recipe Validation Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      if (debugEnabled) {
+        const durationMs = Date.now() - requestStartedAt;
+        setRecipeDebugInfo({
+          request: requestInfo,
+          response: {
+            durationMs,
+            status: responseStatus || 0,
+            statusText: responseStatusText || "Error",
+            weightBytes: responseWeightBytes,
+            body: responseBody ?? { message: errorMessage },
+          },
+          errorMessage,
+        });
+      }
+    } finally {
+      setRecipeIsRunning(false);
+    }
   };
 
-  const handleExport = (format: 'csv' | 'xlsx' | 'json') => {
-    toast({
-      title: "Export Started",
-      description: `Exporting results as ${format.toUpperCase()}...`,
-    });
+  const currentIsRunning = activeMode === "ingredients" ? ingredientIsRunning : recipeIsRunning;
+  const currentCanRun = activeMode === "ingredients" ? ingredientCanRun : recipeCanRun;
+  const currentResults = activeMode === "ingredients" ? ingredientResults : recipeResults;
+  const currentSummary = activeMode === "ingredients" ? ingredientSummary : recipeSummary;
+  const currentDebugInfo = activeMode === "ingredients" ? ingredientDebugInfo : recipeDebugInfo;
+  const currentHistory = activeMode === "ingredients" ? ingredientHistory : recipeHistory;
+  const currentSelectedHistoryId = activeMode === "ingredients" ? selectedIngredientHistoryId : selectedRecipeHistoryId;
+  const currentTab = activeMode === "ingredients" ? ingredientTab : recipeTab;
+
+  const handleTabChange = (value: string) => {
+    const val = value as TabValue;
+    if (activeMode === "ingredients") {
+      setIngredientTab(val);
+    } else {
+      setRecipeTab(val);
+    }
+  };
+
+  const handleHistorySelect = (id: string) => {
+    if (activeMode === "ingredients") {
+      setSelectedIngredientHistoryId(id);
+    } else {
+      setSelectedRecipeHistoryId(id);
+    }
+  };
+
+  const historyTabLabel = activeMode === "ingredients"
+    ? "Ingredients validation results"
+    : "Recipe validation results";
+
+  const historyTitle = activeMode === "ingredients"
+    ? "Ingredients Validation Results"
+    : "Recipe Validation Results";
+
+  const runActiveValidation = () => {
+    if (activeMode === "ingredients") {
+      void runIngredientValidation();
+    } else {
+      void runRecipeValidation();
+    }
   };
 
   return (
     <div className="min-h-screen bg-muted/30">
       <RegCheckHeader
         onSettingsClick={() => setSettingsOpen(true)}
-        onRunValidation={handleRunValidation}
-        onSaveScenario={handleSaveScenario}
-        onExport={handleExport}
-        isRunning={isRunning}
-        canRun={canRun}
+        onRunValidation={runActiveValidation}
+        isRunning={currentIsRunning}
+        canRun={currentCanRun}
+        mode={activeMode}
+        onModeChange={setActiveMode}
       />
       
       <div className="container mx-auto p-6">
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'builder' | 'history')}
-          className="space-y-6"
-        >
+        <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="builder">Validation Builder</TabsTrigger>
-            <TabsTrigger value="history">Ingredients validation results</TabsTrigger>
+            <TabsTrigger value={TAB_BUILDER}>Validation Builder</TabsTrigger>
+            <TabsTrigger value={TAB_HISTORY}>{historyTabLabel}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="builder">
+          <TabsContent value={TAB_BUILDER}>
             <div className="grid gap-6 grid-cols-3">
-              {(results.length > 0 || isRunning) && (
+              {(currentResults.length > 0 || currentIsRunning) && (
                 <div className="col-span-3">
                   <ResultsTable
-                    data={results}
-                    summary={resultsSummary}
-                    isLoading={isRunning}
+                    data={currentResults}
+                    summary={currentSummary}
+                    isLoading={currentIsRunning}
                   />
                 </div>
               )}
-              {debugInfo && (
+              {currentDebugInfo && (
                 <div className="col-span-3">
-                  <DebugPanel info={debugInfo} />
+                  <DebugPanel info={currentDebugInfo} />
                 </div>
               )}
               <div>
                 <ScopeBuilder
-                  scenarioName={scenarioName}
-                  countries={countries}
-                  usages={usages}
-                  onScenarioNameChange={setScenarioName}
-                  onCountriesChange={setCountries}
-                  onUsagesChange={setUsages}
+                  scenarioName={activeMode === "ingredients" ? ingredientScenarioName : recipeScenarioName}
+                  countries={activeMode === "ingredients" ? ingredientCountries : recipeCountries}
+                  usages={activeMode === "ingredients" ? ingredientUsages : recipeUsages}
+                  onScenarioNameChange={activeMode === "ingredients" ? setIngredientScenarioName : setRecipeScenarioName}
+                  onCountriesChange={activeMode === "ingredients" ? setIngredientCountries : setRecipeCountries}
+                  onUsagesChange={activeMode === "ingredients" ? setIngredientUsages : setRecipeUsages}
                 />
               </div>
               
               <div className="col-span-2">
-                <IngredientsBuilder
-                  ingredients={ingredients}
-                  onIngredientsChange={setIngredients}
-                />
+                {activeMode === "ingredients" ? (
+                  <IngredientsBuilder
+                    ingredients={ingredientItems}
+                    onIngredientsChange={setIngredientItems}
+                  />
+                ) : (
+                  <RecipeBuilder
+                    ingredients={recipeIngredients}
+                    recipeSpec={recipeSpec}
+                    onRecipeSpecChange={setRecipeSpec}
+                    onIngredientsChange={setRecipeIngredients}
+                  />
+                )}
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="history">
+          <TabsContent value={TAB_HISTORY}>
             <ValidationHistory
-              records={validationHistory}
-              selectedRecordId={selectedHistoryId}
-              onSelectRecord={(id) => setSelectedHistoryId(id)}
+              records={currentHistory}
+              selectedRecordId={currentSelectedHistoryId}
+              onSelectRecord={handleHistorySelect}
+              title={historyTitle}
             />
           </TabsContent>
         </Tabs>
