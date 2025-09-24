@@ -1,4 +1,4 @@
-import { Settings, Play } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -6,18 +6,12 @@ type ValidationMode = 'ingredients' | 'recipe';
 
 interface RegCheckHeaderProps {
   onSettingsClick: () => void;
-  onRunValidation: () => void;
-  isRunning: boolean;
-  canRun: boolean;
   mode: ValidationMode;
   onModeChange: (mode: ValidationMode) => void;
 }
 
 export function RegCheckHeader({
   onSettingsClick,
-  onRunValidation,
-  isRunning,
-  canRun,
   mode,
   onModeChange,
 }: RegCheckHeaderProps) {
@@ -39,7 +33,7 @@ export function RegCheckHeader({
               <span>RegCheck</span>
             </Link>
           </h1>
-          <span className="text-sm text-muted-foreground">Compliance Validation Platform</span>
+          <span className="text-sm text-muted-foreground">Regulatory compliance analysis</span>
         </div>
         
         <div className="flex items-center space-x-3">
@@ -62,15 +56,6 @@ export function RegCheckHeader({
             </Button>
           </div>
 
-          <Button
-            onClick={onRunValidation}
-            disabled={!canRun || isRunning}
-            className="bg-primary hover:bg-primary/90"
-          >
-            <Play className="w-4 h-4 mr-2" />
-            {isRunning ? "Running..." : "Run Validation"}
-          </Button>
-          
           <Button variant="outline" onClick={onSettingsClick}>
             <Settings className="w-4 h-4" />
           </Button>

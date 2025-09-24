@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RegCheckHeader } from "@/components/RegCheckHeader";
+import { Play } from "lucide-react";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { IngredientsBuilder } from "@/components/IngredientsBuilder";
 import { RecipeBuilder } from "@/components/RecipeBuilder";
@@ -1412,9 +1413,6 @@ const Index = () => {
     <div className="min-h-screen bg-muted/30">
       <RegCheckHeader
         onSettingsClick={() => setSettingsOpen(true)}
-        onRunValidation={runActiveValidation}
-        isRunning={currentIsRunning}
-        canRun={currentCanRun}
         mode={activeMode}
         onModeChange={setActiveMode}
       />
@@ -1480,14 +1478,22 @@ const Index = () => {
                     onIngredientsChange={setRecipeIngredients}
                   />
                 )}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={activeMode === "ingredients" ? resetIngredientBuilder : resetRecipeBuilder}
                     disabled={currentIsRunning}
                   >
-                    Reset Builder
+                    Reset
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={runActiveValidation}
+                    disabled={!currentCanRun || currentIsRunning}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {currentIsRunning ? "Analyzing..." : "Analyze compliance"}
                   </Button>
                 </div>
               </div>
