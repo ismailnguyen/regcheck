@@ -1,6 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import { promises as fs } from "fs";
 import * as path from "path";
+import * as os from "os";
 
 type JobStatus = "pending" | "running" | "completed" | "failed";
 
@@ -36,7 +37,8 @@ export interface JobRecord {
 }
 
 const STORE_NAME = "regcheck-jobs";
-const FALLBACK_FILE_PATH = path.join(process.cwd(), ".netlify", "state", `${STORE_NAME}.json`);
+const FALLBACK_DIR = path.join(os.tmpdir(), "regcheck-jobs");
+const FALLBACK_FILE_PATH = path.join(FALLBACK_DIR, `${STORE_NAME}.json`);
 
 type BlobStore = {
   getJSON<T>(key: string): Promise<T | null>;
@@ -89,7 +91,7 @@ const createFileStore = (): JsonStore => {
   };
 
   const writeAll = async (data: Record<string, unknown>) => {
-    await fs.mkdir(path.dirname(FALLBACK_FILE_PATH), { recursive: true });
+    await fs.mkdir(FALLBACK_DIR, { recursive: true });
     await fs.writeFile(FALLBACK_FILE_PATH, JSON.stringify(data, null, 2), "utf8");
   };
 
@@ -164,7 +166,7 @@ const resolveStore = (): JsonStore => {
       const isMissingEnv = error instanceof Error && error.name === "MissingBlobsEnvironmentError";
       const prefix = "Falling back to local job store";
       const suffix = isMissingEnv
-        ? "Netlify Blobs environment variables are not configured. Jobs will be persisted to .netlify/state during local development."
+        ? `Netlify Blobs environment variables are not configured. Jobs will be persisted to ${FALLBACK_DIR} during local development.`
         : message;
       console.info(`${prefix}: ${suffix}`);
       hasLoggedFallbackWarning = true;
