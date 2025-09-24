@@ -778,7 +778,9 @@ const Index = () => {
       setIngredientResults(results);
       setIngredientSummary(summary);
 
-      ingredientResponseApplyingRef.current = true;
+      if (ingredientDebugInfo) {
+        ingredientResponseApplyingRef.current = true;
+      }
       setIngredientResponseText(JSON.stringify(parsed, null, 2));
       setIngredientResponseError(null);
 
@@ -798,7 +800,7 @@ const Index = () => {
       const message = error instanceof Error ? error.message : "Invalid JSON body";
       setIngredientResponseError(message);
     }
-  }, [debugModeEnabled]);
+  }, [debugModeEnabled, ingredientDebugInfo]);
 
   const handleRecipeResponseTextChange = useCallback((value: string) => {
     setRecipeResponseText(value);
@@ -814,7 +816,9 @@ const Index = () => {
       setRecipeResults(results);
       setRecipeSummary(summary);
 
-      recipeResponseApplyingRef.current = true;
+      if (recipeDebugInfo) {
+        recipeResponseApplyingRef.current = true;
+      }
       setRecipeResponseText(JSON.stringify(parsed, null, 2));
       setRecipeResponseError(null);
 
@@ -834,7 +838,7 @@ const Index = () => {
       const message = error instanceof Error ? error.message : "Invalid JSON body";
       setRecipeResponseError(message);
     }
-  }, [debugModeEnabled]);
+  }, [debugModeEnabled, recipeDebugInfo]);
 
   const runIngredientValidation = async () => {
     const settings = getSettings();
