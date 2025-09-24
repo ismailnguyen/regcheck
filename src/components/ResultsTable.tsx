@@ -256,7 +256,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
               </TableHeader>
               <TableBody>
                 {paginatedData.map((row, index) => {
-                  const ingredientName = row.name || row.spec || '–';
+                  const ingredientName = row.spec || row.spec || row.customerName || '–';
                   return (
                     <TableRow key={`${row.customerId}-${row.country}-${row.usage}-${index}`}>
                       <TableCell className="font-medium">{ingredientName}</TableCell>
