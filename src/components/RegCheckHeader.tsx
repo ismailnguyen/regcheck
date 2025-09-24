@@ -28,9 +28,15 @@ export function RegCheckHeader({
           <h1 className="text-2xl font-bold">
             <Link
               to="/"
-              className="text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:text-primary/90"
+              className="flex items-center gap-2 text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:text-primary/90"
             >
-              RegCheck
+              <img
+                src="/favicon.svg"
+                alt=""
+                aria-hidden="true"
+                className="h-8 w-8"
+              />
+              <span>RegCheck</span>
             </Link>
           </h1>
           <span className="text-sm text-muted-foreground">Compliance Validation Platform</span>
