@@ -13,6 +13,9 @@ interface DebugPanelProps {
   payloadText: string;
   onPayloadTextChange: (value: string) => void;
   payloadError?: string | null;
+  responseBodyText: string;
+  onResponseBodyTextChange: (value: string) => void;
+  responseBodyError?: string | null;
 }
 
 const formatDuration = (durationMs: number): string => {
@@ -31,14 +34,6 @@ const formatWeight = (bytes?: number): string => {
   return `${display} (${bytes} B)`;
 };
 
-const stringify = (value: unknown): string => {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
 export function DebugPanel({
   request,
   response,
@@ -46,9 +41,16 @@ export function DebugPanel({
   payloadText,
   onPayloadTextChange,
   payloadError,
+  responseBodyText,
+  onResponseBodyTextChange,
+  responseBodyError,
 }: DebugPanelProps) {
   const handlePayloadChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     onPayloadTextChange(event.target.value);
+  };
+
+  const handleResponseBodyChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onResponseBodyTextChange(event.target.value);
   };
 
   return (
@@ -90,22 +92,36 @@ export function DebugPanel({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold uppercase text-muted-foreground">Response</h3>
             {response ? (
-              <>
-                <div className="text-sm space-y-1">
-                  <p><span className="font-medium">Status:</span> {response.status}{response.statusText ? ` (${response.statusText})` : ""}</p>
-                  <p><span className="font-medium">Response time:</span> {formatDuration(response.durationMs)}</p>
-                  <p><span className="font-medium">Response weight:</span> {formatWeight(response.weightBytes)}</p>
-                </div>
-                <div className="rounded-md border bg-muted/30 p-3">
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">JSON Body</p>
-                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{stringify(response.body)}</pre>
-                </div>
-              </>
+              <div className="text-sm space-y-1">
+                <p><span className="font-medium">Status:</span> {response.status}{response.statusText ? ` (${response.statusText})` : ""}</p>
+                <p><span className="font-medium">Response time:</span> {formatDuration(response.durationMs)}</p>
+                <p><span className="font-medium">Response weight:</span> {formatWeight(response.weightBytes)}</p>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Run a validation to view the latest response details.
+                No response captured yet. Paste or edit JSON below to simulate results.
               </p>
             )}
+            <div className="rounded-md border bg-muted/30 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">JSON Body</p>
+                {responseBodyError && (
+                  <span className="text-xs font-medium text-destructive">{responseBodyError}</span>
+                )}
+              </div>
+              <Textarea
+                value={responseBodyText}
+                onChange={handleResponseBodyChange}
+                className={cn(
+                  "min-h-[280px] font-mono text-xs",
+                  responseBodyError ? "border-destructive focus-visible:ring-destructive" : ""
+                )}
+                spellCheck={false}
+              />
+              <p className="pt-2 text-xs text-muted-foreground">
+                Editing the response instantly updates the results table.
+              </p>
+            </div>
           </section>
         </div>
         {errorMessage && (

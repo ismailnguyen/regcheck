@@ -105,6 +105,130 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 };
 
+const formatJsonForEditor = (value: unknown): string => {
+  if (value === undefined) {
+    return "";
+  }
+
+  if (value === null) {
+    return "null";
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return value;
+    }
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const computeIngredientResults = (body: unknown): { results: ReportRow[]; summary: ResultSummary } => {
+  if (!isRecord(body)) {
+    throw new Error("Response body must be a JSON object");
+  }
+
+  const report = (body as ApiResponse).ingredientAnalysisReport;
+
+  if (!report || !Array.isArray(report.tabularReport)) {
+    throw new Error("API response missing tabular report data");
+  }
+
+  const results = report.tabularReport.map((row) => ({
+    ...row,
+    resultIndicator: row.resultIndicator || "UNKNOWN",
+  }));
+
+  const summary: ResultSummary = {
+    countsByIndicator: {},
+    total: results.length,
+  };
+
+  results.forEach(result => {
+    const indicator = result.resultIndicator || "UNKNOWN";
+    summary.countsByIndicator[indicator] =
+      (summary.countsByIndicator[indicator] || 0) + 1;
+  });
+
+  return { results, summary };
+};
+
+const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: ResultSummary } => {
+  if (!isRecord(body)) {
+    throw new Error("Response body must be a JSON object");
+  }
+
+  const apiResponse = body as ApiResponse & {
+    recipeAnalaysisReport?: {
+      recipeReport?: Array<{
+        country?: string;
+        resultIndicator?: string;
+        tabularReport?: ReportRow[];
+      }>;
+    };
+  } & {
+    recipeAnalysisReport?: {
+      recipeReport?: Array<{
+        country?: string;
+        resultIndicator?: string;
+        tabularReport?: ReportRow[];
+      }>;
+    };
+  };
+
+  const recipeReportContainer = apiResponse.recipeAnalaysisReport || apiResponse.recipeAnalysisReport;
+  let results: ReportRow[] = [];
+
+  if (recipeReportContainer?.recipeReport && Array.isArray(recipeReportContainer.recipeReport)) {
+    results = recipeReportContainer.recipeReport.flatMap((entry) => {
+      const entryCountry = entry.country || "";
+      const entryIndicator = entry.resultIndicator;
+      const tabular = Array.isArray(entry.tabularReport) ? entry.tabularReport : [];
+      return tabular.map((row) => ({
+        ...row,
+        country: row.country || entryCountry,
+        resultIndicator: row.resultIndicator || entryIndicator || "UNKNOWN",
+      }));
+    });
+  }
+
+  if (results.length === 0 && apiResponse.ingredientAnalysisReport?.tabularReport) {
+    results = apiResponse.ingredientAnalysisReport.tabularReport.map((row) => ({
+      ...row,
+      resultIndicator: row.resultIndicator || "UNKNOWN",
+    }));
+  }
+
+  if (results.length === 0) {
+    throw new Error("API response missing recipe report data");
+  }
+
+  const summary: ResultSummary = {
+    countsByIndicator: {},
+    total: results.length,
+  };
+
+  results.forEach(result => {
+    const indicator = result.resultIndicator || "UNKNOWN";
+    summary.countsByIndicator[indicator] =
+      (summary.countsByIndicator[indicator] || 0) + 1;
+  });
+
+  return { results, summary };
+};
+
 const buildIngredientPayload = (
   scenarioName: string,
   countries: Country[],
@@ -235,6 +359,12 @@ const Index = () => {
   const [recipePayloadError, setRecipePayloadError] = useState<string | null>(null);
   const ingredientPayloadApplyingRef = useRef(false);
   const recipePayloadApplyingRef = useRef(false);
+  const [ingredientResponseText, setIngredientResponseText] = useState("");
+  const [ingredientResponseError, setIngredientResponseError] = useState<string | null>(null);
+  const [recipeResponseText, setRecipeResponseText] = useState("");
+  const [recipeResponseError, setRecipeResponseError] = useState<string | null>(null);
+  const ingredientResponseApplyingRef = useRef(false);
+  const recipeResponseApplyingRef = useRef(false);
 
   useEffect(() => {
     const ingredientHistoryData = getIngredientValidationHistory();
@@ -316,6 +446,10 @@ const Index = () => {
       setRecipePayloadError(null);
       setIngredientPayloadText("");
       setRecipePayloadText("");
+      setIngredientResponseText("");
+      setRecipeResponseText("");
+      setIngredientResponseError(null);
+      setRecipeResponseError(null);
       return;
     }
   }, [debugModeEnabled]);
@@ -345,6 +479,46 @@ const Index = () => {
     setRecipePayloadText(payloadString);
     setRecipePayloadError(null);
   }, [debugModeEnabled, recipeRequestPayload]);
+
+  useEffect(() => {
+    if (!debugModeEnabled) {
+      return;
+    }
+    if (ingredientResponseApplyingRef.current) {
+      ingredientResponseApplyingRef.current = false;
+      return;
+    }
+
+    const body = ingredientDebugInfo?.response?.body;
+    if (body === undefined) {
+      setIngredientResponseText("");
+      setIngredientResponseError(null);
+      return;
+    }
+
+    setIngredientResponseText(formatJsonForEditor(body));
+    setIngredientResponseError(null);
+  }, [debugModeEnabled, ingredientDebugInfo]);
+
+  useEffect(() => {
+    if (!debugModeEnabled) {
+      return;
+    }
+    if (recipeResponseApplyingRef.current) {
+      recipeResponseApplyingRef.current = false;
+      return;
+    }
+
+    const body = recipeDebugInfo?.response?.body;
+    if (body === undefined) {
+      setRecipeResponseText("");
+      setRecipeResponseError(null);
+      return;
+    }
+
+    setRecipeResponseText(formatJsonForEditor(body));
+    setRecipeResponseError(null);
+  }, [debugModeEnabled, recipeDebugInfo]);
 
   const handleIngredientPayloadTextChange = useCallback((value: string) => {
     setIngredientPayloadText(value);
@@ -590,6 +764,78 @@ const Index = () => {
     }
   }, [debugModeEnabled]);
 
+  const handleIngredientResponseTextChange = useCallback((value: string) => {
+    setIngredientResponseText(value);
+
+    if (!debugModeEnabled) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      const { results, summary } = computeIngredientResults(parsed);
+
+      setIngredientResults(results);
+      setIngredientSummary(summary);
+
+      ingredientResponseApplyingRef.current = true;
+      setIngredientResponseText(JSON.stringify(parsed, null, 2));
+      setIngredientResponseError(null);
+
+      setIngredientDebugInfo(prev => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          response: {
+            ...prev.response,
+            body: parsed,
+          },
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid JSON body";
+      setIngredientResponseError(message);
+    }
+  }, [debugModeEnabled]);
+
+  const handleRecipeResponseTextChange = useCallback((value: string) => {
+    setRecipeResponseText(value);
+
+    if (!debugModeEnabled) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      const { results, summary } = computeRecipeResults(parsed);
+
+      setRecipeResults(results);
+      setRecipeSummary(summary);
+
+      recipeResponseApplyingRef.current = true;
+      setRecipeResponseText(JSON.stringify(parsed, null, 2));
+      setRecipeResponseError(null);
+
+      setRecipeDebugInfo(prev => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          response: {
+            ...prev.response,
+            body: parsed,
+          },
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid JSON body";
+      setRecipeResponseError(message);
+    }
+  }, [debugModeEnabled]);
+
   const runIngredientValidation = async () => {
     const settings = getSettings();
     if (!settings.apiKey) {
@@ -674,28 +920,7 @@ const Index = () => {
         throw new Error("Unexpected API response format");
       }
 
-      const apiResponse = parsedBody as ApiResponse;
-      const report = apiResponse.ingredientAnalysisReport;
-
-      if (!report || !Array.isArray(report.tabularReport)) {
-        throw new Error("API response missing tabular report data");
-      }
-
-      const normalizedResults: ReportRow[] = report.tabularReport.map((row) => ({
-        ...row,
-        resultIndicator: row.resultIndicator || "UNKNOWN",
-      }));
-
-      const summary: ResultSummary = {
-        countsByIndicator: {},
-        total: normalizedResults.length,
-      };
-
-      normalizedResults.forEach(result => {
-        const indicator = result.resultIndicator || "UNKNOWN";
-        summary.countsByIndicator[indicator] =
-          (summary.countsByIndicator[indicator] || 0) + 1;
-      });
+      const { results: normalizedResults, summary } = computeIngredientResults(parsedBody);
 
       ingredientItems.forEach(ingredient => {
         storeIngredient(ingredient);
@@ -860,61 +1085,7 @@ const Index = () => {
         throw new Error("Unexpected API response format");
       }
 
-      const apiResponse = parsedBody as ApiResponse & {
-        recipeAnalaysisReport?: {
-          recipeReport?: Array<{
-            country?: string;
-            resultIndicator?: string;
-            tabularReport?: ReportRow[];
-          }>;
-        };
-      } & {
-        recipeAnalysisReport?: {
-          recipeReport?: Array<{
-            country?: string;
-            resultIndicator?: string;
-            tabularReport?: ReportRow[];
-          }>;
-        };
-      };
-
-      const recipeReportContainer = apiResponse.recipeAnalaysisReport || apiResponse.recipeAnalysisReport;
-      let normalizedResults: ReportRow[] = [];
-
-      if (recipeReportContainer?.recipeReport && Array.isArray(recipeReportContainer.recipeReport)) {
-        normalizedResults = recipeReportContainer.recipeReport.flatMap((entry) => {
-          const entryCountry = entry.country || "";
-          const entryIndicator = entry.resultIndicator;
-          const tabular = Array.isArray(entry.tabularReport) ? entry.tabularReport : [];
-          return tabular.map((row) => ({
-            ...row,
-            country: row.country || entryCountry,
-            resultIndicator: row.resultIndicator || entryIndicator || "UNKNOWN",
-          }));
-        });
-      }
-
-      if (normalizedResults.length === 0 && apiResponse.ingredientAnalysisReport?.tabularReport) {
-        normalizedResults = apiResponse.ingredientAnalysisReport.tabularReport.map((row) => ({
-          ...row,
-          resultIndicator: row.resultIndicator || "UNKNOWN",
-        }));
-      }
-
-      if (normalizedResults.length === 0) {
-        throw new Error("API response missing recipe report data");
-      }
-
-      const summary: ResultSummary = {
-        countsByIndicator: {},
-        total: normalizedResults.length,
-      };
-
-      normalizedResults.forEach(result => {
-        const indicator = result.resultIndicator || "UNKNOWN";
-        summary.countsByIndicator[indicator] =
-          (summary.countsByIndicator[indicator] || 0) + 1;
-      });
+      const { results: normalizedResults, summary } = computeRecipeResults(parsedBody);
 
       recipeIngredients.forEach(({ percentage: _percentage, function: _function, spec: _spec, ...base }) => {
         storeIngredient(base);
@@ -1006,6 +1177,11 @@ const Index = () => {
   const handlePayloadTextChange = activeMode === "ingredients"
     ? handleIngredientPayloadTextChange
     : handleRecipePayloadTextChange;
+  const currentResponseText = activeMode === "ingredients" ? ingredientResponseText : recipeResponseText;
+  const currentResponseError = activeMode === "ingredients" ? ingredientResponseError : recipeResponseError;
+  const handleResponseTextChange = activeMode === "ingredients"
+    ? handleIngredientResponseTextChange
+    : handleRecipeResponseTextChange;
   const currentRequestPayload = activeMode === "ingredients" ? ingredientRequestPayload : recipeRequestPayload;
   const currentEndpoint = activeMode === "ingredients" ? DEFAULT_INGREDIENT_ENDPOINT : DEFAULT_RECIPE_ENDPOINT;
   const defaultRequestInfo: DebugRequestInfo = {
@@ -1121,6 +1297,9 @@ const Index = () => {
                     payloadText={currentPayloadText}
                     onPayloadTextChange={handlePayloadTextChange}
                     payloadError={currentPayloadError}
+                    responseBodyText={currentResponseText}
+                    onResponseBodyTextChange={handleResponseTextChange}
+                    responseBodyError={currentResponseError}
                   />
                 </div>
               )}
