@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ResultsTable } from "@/components/ResultsTable";
+import { Trash2 } from "lucide-react";
 import type { ValidationResultRecord } from "@/types";
 
 interface ValidationHistoryProps {
@@ -11,6 +12,7 @@ interface ValidationHistoryProps {
   selectedRecordId: string | null;
   onSelectRecord: (id: string) => void;
   title?: string;
+  onDeleteRecord?: (id: string) => void;
 }
 
 const formatDate = (iso: string): string => {
@@ -21,7 +23,7 @@ const formatDate = (iso: string): string => {
   }
 };
 
-export function ValidationHistory({ records, selectedRecordId, onSelectRecord, title = "Validation Results" }: ValidationHistoryProps) {
+export function ValidationHistory({ records, selectedRecordId, onSelectRecord, title = "Validation Results", onDeleteRecord }: ValidationHistoryProps) {
   const orderedRecords = useMemo(() => {
     return [...records].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }, [records]);
@@ -46,17 +48,33 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
               <ScrollArea className="h-[360px] rounded-md border p-2">
                 <div className="space-y-2">
                   {orderedRecords.map((record) => (
-                    <Button
-                      key={record.id}
-                      variant={selectedRecord?.id === record.id ? "default" : "outline"}
-                      className="w-full justify-start text-left"
-                      onClick={() => onSelectRecord(record.id)}
-                    >
-                      <div className="flex flex-col items-start">
-                        <span className="font-semibold truncate w-full">{record.name}</span>
-                        <span className="text-xs text-muted-foreground">{formatDate(record.createdAt)}</span>
-                      </div>
-                    </Button>
+                    <div key={record.id} className="flex items-center space-x-2">
+                      <Button
+                        variant={selectedRecord?.id === record.id ? "default" : "outline"}
+                        className="flex-1 justify-start text-left"
+                        onClick={() => onSelectRecord(record.id)}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className="font-semibold truncate w-full">{record.name}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(record.createdAt)}</span>
+                        </div>
+                      </Button>
+                      {onDeleteRecord && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          aria-label={`Delete ${record.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteRecord(record.id);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   ))}
                 </div>
                 <ScrollBar orientation="vertical" />

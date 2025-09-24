@@ -91,6 +91,11 @@ export const saveIngredientValidationResult = (record: ValidationResultRecord): 
   localStorage.setItem(STORAGE_KEYS.INGREDIENT_HISTORY, JSON.stringify(history));
 };
 
+export const deleteIngredientValidationResult = (id: string): void => {
+  const updated = getIngredientValidationHistory().filter(record => record.id !== id);
+  localStorage.setItem(STORAGE_KEYS.INGREDIENT_HISTORY, JSON.stringify(updated));
+};
+
 export const getRecipeValidationHistory = (): ValidationResultRecord[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.RECIPE_HISTORY);
@@ -104,6 +109,11 @@ export const saveRecipeValidationResult = (record: ValidationResultRecord): void
   const history = getRecipeValidationHistory();
   history.unshift(record);
   localStorage.setItem(STORAGE_KEYS.RECIPE_HISTORY, JSON.stringify(history));
+};
+
+export const deleteRecipeValidationResult = (id: string): void => {
+  const updated = getRecipeValidationHistory().filter(record => record.id !== id);
+  localStorage.setItem(STORAGE_KEYS.RECIPE_HISTORY, JSON.stringify(updated));
 };
 
 // Scenarios management

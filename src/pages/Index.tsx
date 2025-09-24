@@ -17,6 +17,8 @@ import {
   saveIngredientValidationResult,
   getRecipeValidationHistory,
   saveRecipeValidationResult,
+  deleteIngredientValidationResult,
+  deleteRecipeValidationResult,
 } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
 import type {
@@ -634,6 +636,32 @@ const Index = () => {
     }
   };
 
+  const handleIngredientHistoryDelete = (id: string) => {
+    deleteIngredientValidationResult(id);
+    setIngredientHistory(prev => {
+      const updated = prev.filter(record => record.id !== id);
+      setSelectedIngredientHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
+      return updated;
+    });
+  };
+
+  const handleRecipeHistoryDelete = (id: string) => {
+    deleteRecipeValidationResult(id);
+    setRecipeHistory(prev => {
+      const updated = prev.filter(record => record.id !== id);
+      setSelectedRecipeHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
+      return updated;
+    });
+  };
+
+  const handleDeleteCurrentHistoryRecord = (id: string) => {
+    if (activeMode === "ingredients") {
+      handleIngredientHistoryDelete(id);
+    } else {
+      handleRecipeHistoryDelete(id);
+    }
+  };
+
   const historyTabLabel = activeMode === "ingredients"
     ? "Ingredients validation results"
     : "Recipe validation results";
@@ -729,6 +757,7 @@ const Index = () => {
               selectedRecordId={currentSelectedHistoryId}
               onSelectRecord={handleHistorySelect}
               title={historyTitle}
+              onDeleteRecord={handleDeleteCurrentHistoryRecord}
             />
           </TabsContent>
         </Tabs>
