@@ -56,6 +56,7 @@ const createMemoryStore = (): JsonStore => ({
 });
 
 let jobStore: JsonStore | null = null;
+let hasLoggedFallbackWarning = false;
 
 const resolveStore = (): JsonStore => {
   if (jobStore) {
@@ -66,7 +67,16 @@ const resolveStore = (): JsonStore => {
     jobStore = getStore({ name: STORE_NAME });
     return jobStore;
   } catch (error) {
-    console.warn("Falling back to in-memory job store", error);
+    if (!hasLoggedFallbackWarning) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isMissingEnv = error instanceof Error && error.name === "MissingBlobsEnvironmentError";
+      const prefix = "Falling back to in-memory job store";
+      const suffix = isMissingEnv
+        ? "Netlify Blobs environment variables are not configured. Jobs will reset between runs when using the local dev server."
+        : message;
+      console.info(`${prefix}: ${suffix}`);
+      hasLoggedFallbackWarning = true;
+    }
     jobStore = createMemoryStore();
     return jobStore;
   }
