@@ -251,7 +251,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Link</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
