@@ -30,6 +30,26 @@ interface ResultsTableProps {
 type SortField = keyof ReportRow;
 type SortDirection = 'asc' | 'desc' | null;
 
+interface ColumnDefinition {
+  key: keyof ReportRow;
+  label: string;
+  filterable: boolean;
+}
+
+const TABLE_COLUMNS: ColumnDefinition[] = [
+  { key: 'customerName', label: 'Ingredient Name', filterable: true },
+  { key: 'country', label: 'Country', filterable: true },
+  { key: 'usage', label: 'Usage', filterable: true },
+  { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
+  { key: 'threshold', label: 'Restriction Level', filterable: true },
+  { key: 'regulation', label: 'Regulation', filterable: true },
+  { key: 'citation', label: 'Legal Quote', filterable: true },
+  { key: 'idType', label: 'ID Type', filterable: true },
+  { key: 'idValue', label: 'ID Value', filterable: true },
+  { key: 'decernisName', label: 'Decernis Name', filterable: true },
+  { key: 'function', label: 'Function', filterable: true },
+];
+
 export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -79,6 +99,28 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
     return filtered;
   }, [data, filters, sortField, sortDirection]);
 
+  const filterSuggestions = useMemo(() => {
+    const suggestions: Record<string, string[]> = {};
+    TABLE_COLUMNS.forEach((column) => {
+      if (!column.filterable) {
+        return;
+      }
+      const values = new Set<string>();
+      data.forEach((row) => {
+        const raw = row[column.key as keyof ReportRow];
+        if (raw === undefined || raw === null) {
+          return;
+        }
+        const normalized = String(raw).trim();
+        if (normalized) {
+          values.add(normalized);
+        }
+      });
+      suggestions[column.key] = Array.from(values).sort((a, b) => a.localeCompare(b));
+    });
+    return suggestions;
+  }, [data]);
+
   const paginatedData = useMemo(() => {
     if (pageSize === 'all') {
       return filteredAndSortedData;
@@ -107,20 +149,6 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
       </Badge>
     );
   };
-
-  const columns = [
-    { key: 'customerName', label: 'Ingredient Name', filterable: true },
-    { key: 'country', label: 'Country', filterable: true },
-    { key: 'usage', label: 'Usage', filterable: true },
-    { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
-    { key: 'threshold', label: 'Restriction Level', filterable: true },
-    { key: 'regulation', label: 'Regulation', filterable: true },
-    { key: 'citation', label: 'Legal Quote', filterable: true },
-    { key: 'idType', label: 'ID Type', filterable: true },
-    { key: 'idValue', label: 'ID Value', filterable: true },
-    { key: 'decernisName', label: 'Decernis Name', filterable: true },
-    { key: 'function', label: 'Function', filterable: true },
-  ];
 
   if (isLoading) {
     return (
@@ -192,7 +220,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {columns.map(column => (
+                  {TABLE_COLUMNS.map(column => (
                     <TableHead key={column.key} className="relative">
                       <div className="space-y-2">
                         <Button
@@ -209,8 +237,16 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
                             placeholder={`Filter ${column.label.toLowerCase()}...`}
                             value={filters[column.key] || ''}
                             onChange={(e) => handleFilter(column.key, e.target.value)}
+                            list={`filter-${column.key}`}
                             className="h-8 text-xs"
                           />
+                        )}
+                        {column.filterable && filterSuggestions[column.key]?.length > 0 && (
+                          <datalist id={`filter-${column.key}`}>
+                            {filterSuggestions[column.key].map((option) => (
+                              <option key={option} value={option} />
+                            ))}
+                          </datalist>
                         )}
                       </div>
                     </TableHead>
