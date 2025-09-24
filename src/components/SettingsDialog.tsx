@@ -17,9 +17,10 @@ import type { AppSettings } from "@/types";
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave?: (settings: Partial<AppSettings>) => void;
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, onSave }: SettingsDialogProps) {
   const [settings, setSettings] = useState<Partial<AppSettings>>({
     apiKey: "",
     debugMode: false,
@@ -38,6 +39,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const handleSave = () => {
     saveSettings(settings);
+    onSave?.(settings);
     onOpenChange(false);
   };
 

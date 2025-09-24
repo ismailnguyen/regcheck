@@ -1,9 +1,18 @@
+import * as React from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DebugInfo } from "@/types";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import type { DebugRequestInfo, DebugResponseInfo } from "@/types";
 
 interface DebugPanelProps {
-  info: DebugInfo;
+  request: DebugRequestInfo;
+  response?: DebugResponseInfo;
+  errorMessage?: string;
+  payloadText: string;
+  onPayloadTextChange: (value: string) => void;
+  payloadError?: string | null;
 }
 
 const formatDuration = (durationMs: number): string => {
@@ -30,8 +39,17 @@ const stringify = (value: unknown): string => {
   }
 };
 
-export function DebugPanel({ info }: DebugPanelProps) {
-  const { request, response, errorMessage } = info;
+export function DebugPanel({
+  request,
+  response,
+  errorMessage,
+  payloadText,
+  onPayloadTextChange,
+  payloadError,
+}: DebugPanelProps) {
+  const handlePayloadChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onPayloadTextChange(event.target.value);
+  };
 
   return (
     <Card>
@@ -48,22 +66,46 @@ export function DebugPanel({ info }: DebugPanelProps) {
               <p className="break-words"><span className="font-medium">URL:</span> {request.url}</p>
             </div>
             <div className="rounded-md border bg-muted/30 p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">JSON Payload</p>
-              <pre className="max-h-64 overflow-auto text-xs whitespace-pre-wrap">{stringify(request.payload)}</pre>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">JSON Payload</p>
+                {payloadError && (
+                  <span className="text-xs font-medium text-destructive">{payloadError}</span>
+                )}
+              </div>
+              <Textarea
+                value={payloadText}
+                onChange={handlePayloadChange}
+                className={cn(
+                  "min-h-[280px] font-mono text-xs",
+                  payloadError ? "border-destructive focus-visible:ring-destructive" : ""
+                )}
+                spellCheck={false}
+              />
+              <p className="pt-2 text-xs text-muted-foreground">
+                Editing the payload keeps the validation builder in sync.
+              </p>
             </div>
           </section>
 
           <section className="space-y-3">
             <h3 className="text-sm font-semibold uppercase text-muted-foreground">Response</h3>
-            <div className="text-sm space-y-1">
-              <p><span className="font-medium">Status:</span> {response.status}{response.statusText ? ` (${response.statusText})` : ""}</p>
-              <p><span className="font-medium">Response time:</span> {formatDuration(response.durationMs)}</p>
-              <p><span className="font-medium">Response weight:</span> {formatWeight(response.weightBytes)}</p>
-            </div>
-            <div className="rounded-md border bg-muted/30 p-3">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">JSON Body</p>
-              <pre className="max-h-64 overflow-auto text-xs whitespace-pre-wrap">{stringify(response.body)}</pre>
-            </div>
+            {response ? (
+              <>
+                <div className="text-sm space-y-1">
+                  <p><span className="font-medium">Status:</span> {response.status}{response.statusText ? ` (${response.statusText})` : ""}</p>
+                  <p><span className="font-medium">Response time:</span> {formatDuration(response.durationMs)}</p>
+                  <p><span className="font-medium">Response weight:</span> {formatWeight(response.weightBytes)}</p>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">JSON Body</p>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{stringify(response.body)}</pre>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Run a validation to view the latest response details.
+              </p>
+            )}
           </section>
         </div>
         {errorMessage && (
