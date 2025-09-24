@@ -32,6 +32,7 @@ import type {
   IdType,
 } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 const TAB_BUILDER = "builder" as const;
 const TAB_HISTORY = "history" as const;
@@ -98,6 +99,16 @@ const Index = () => {
     ingredientItems.length > 0 &&
     ingredientItems.every((ing) => ing.name.trim() && ing.idValue.trim());
 
+  const resetIngredientBuilder = () => {
+    setIngredientScenarioName("");
+    setIngredientCountries([]);
+    setIngredientUsages([]);
+    setIngredientItems([]);
+    setIngredientResults([]);
+    setIngredientSummary(undefined);
+    setIngredientDebugInfo(null);
+  };
+
   const recipeTotalPercentage = useMemo(
     () => recipeIngredients.reduce((total, ing) => total + (Number.isFinite(ing.percentage) ? ing.percentage : 0), 0),
     [recipeIngredients]
@@ -118,6 +129,17 @@ const Index = () => {
     recipeInputsValid &&
     recipeTotalPercentage > 0 &&
     recipeTotalPercentage <= 100;
+
+  const resetRecipeBuilder = () => {
+    setRecipeScenarioName("");
+    setRecipeCountries([]);
+    setRecipeUsages([]);
+    setRecipeIngredients([]);
+    setRecipeSpec("");
+    setRecipeResults([]);
+    setRecipeSummary(undefined);
+    setRecipeDebugInfo(null);
+  };
 
   const runIngredientValidation = async () => {
     const settings = getSettings();
@@ -673,7 +695,7 @@ const Index = () => {
                 />
               </div>
               
-              <div className="col-span-2">
+              <div className="col-span-2 space-y-4">
                 {activeMode === "ingredients" ? (
                   <IngredientsBuilder
                     ingredients={ingredientItems}
@@ -687,6 +709,16 @@ const Index = () => {
                     onIngredientsChange={setRecipeIngredients}
                   />
                 )}
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={activeMode === "ingredients" ? resetIngredientBuilder : resetRecipeBuilder}
+                    disabled={currentIsRunning}
+                  >
+                    Reset Builder
+                  </Button>
+                </div>
               </div>
             </div>
           </TabsContent>
