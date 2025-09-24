@@ -1408,13 +1408,13 @@ const Index = () => {
   };
 
   const runActiveValidation = () => {
+    scrollToTop();
+
     if (activeMode === "ingredients") {
       void runIngredientValidation();
     } else {
       void runRecipeValidation();
     }
-
-    scrollToTop();
   };
 
   return (
@@ -1425,7 +1425,7 @@ const Index = () => {
         onModeChange={setActiveMode}
       />
       
-      <div className="container mx-auto px-0 py-6">
+      <div className="container mx-auto px-2 py-6 2xl:max-w-none">
         <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
             <TabsTrigger value={TAB_BUILDER}>Validation Builder</TabsTrigger>
