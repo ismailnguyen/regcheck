@@ -1401,12 +1401,20 @@ const Index = () => {
     ? (recipeScenarioName.trim() || "Untitled Recipe")
     : undefined;
 
+  const scrollToTop = () => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   const runActiveValidation = () => {
     if (activeMode === "ingredients") {
       void runIngredientValidation();
     } else {
       void runRecipeValidation();
     }
+
+    scrollToTop();
   };
 
   return (
