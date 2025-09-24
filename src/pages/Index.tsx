@@ -473,7 +473,7 @@ const buildRecipePayload = (
 };
 
 const Index = () => {
-  const [activeMode, setActiveMode] = useState<Mode>("ingredients");
+  const [activeMode, setActiveMode] = useState<Mode>("recipe");
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Ingredient builder state
