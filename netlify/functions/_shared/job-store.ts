@@ -49,12 +49,7 @@ type LambdaConnectEvent = {
   headers?: Record<string, string | string[] | undefined>;
 } | null | undefined;
 
-type BlobStore = {
-  getJSON<T>(key: string): Promise<T | null>;
-  setJSON<T>(key: string, value: T): Promise<void>;
-  delete(key: string): Promise<void>;
-  list?: (options?: { prefix?: string }) => AsyncIterable<{ key: string }>;
-};
+type BlobStore = ReturnType<typeof getStore>;
 
 type JsonStore = {
   getJSON<T>(key: string): Promise<T | null>;
@@ -160,7 +155,8 @@ const createBlobStore = (): JsonStore => {
 
   return {
     async getJSON<T>(key: string) {
-      return (await store.getJSON<T>(key)) ?? null;
+      const result = await store.get(key, { type: "json" });
+      return (result ?? null) as T | null;
     },
     async setJSON<T>(key: string, value: T) {
       await store.setJSON(key, value);
