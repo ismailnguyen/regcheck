@@ -34,7 +34,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState<number | 'all'>(50);
   const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (field: SortField) => {
@@ -59,7 +59,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
   };
 
   const filteredAndSortedData = useMemo(() => {
-    let filtered = data.filter(row => {
+    const filtered = data.filter(row => {
       return Object.entries(filters).every(([column, filterValue]) => {
         if (!filterValue) return true;
         const cellValue = String(row[column as keyof ReportRow] || '').toLowerCase();
@@ -80,11 +80,16 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
   }, [data, filters, sortField, sortDirection]);
 
   const paginatedData = useMemo(() => {
+    if (pageSize === 'all') {
+      return filteredAndSortedData;
+    }
     const startIndex = (currentPage - 1) * pageSize;
     return filteredAndSortedData.slice(startIndex, startIndex + pageSize);
   }, [filteredAndSortedData, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(filteredAndSortedData.length / pageSize);
+  const totalPages = pageSize === 'all'
+    ? 1
+    : Math.max(1, Math.ceil(filteredAndSortedData.length / pageSize));
 
   const getStatusBadge = (indicator: string) => {
     const status = indicator.toUpperCase();
@@ -109,7 +114,8 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
     { key: 'usage', label: 'Usage', filterable: true },
     { key: 'resultIndicator', label: 'Restriction Result', filterable: true },
     { key: 'threshold', label: 'Restriction Level', filterable: true },
-    { key: 'citation', label: 'Legal Quote', filterable: false },
+    { key: 'regulation', label: 'Regulation', filterable: true },
+    { key: 'citation', label: 'Legal Quote', filterable: true },
     { key: 'idType', label: 'ID Type', filterable: true },
     { key: 'idValue', label: 'ID Value', filterable: true },
     { key: 'decernisName', label: 'Decernis Name', filterable: true },
@@ -149,6 +155,20 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
       </Card>
     );
   }
+
+  const handlePageSizeChange = (value: string) => {
+    if (value === 'all') {
+      setPageSize('all');
+      setCurrentPage(1);
+      return;
+    }
+
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      setPageSize(numeric);
+      setCurrentPage(1);
+    }
+  };
 
   return (
     <Card>
@@ -199,74 +219,77 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedData.map((row, index) => (
-                  <TableRow key={`${row.customerId}-${row.country}-${row.usage}-${index}`}>
-                    <TableCell className="font-medium">{row.customerName || '–'}</TableCell>
-                    <TableCell>{row.country || '–'}</TableCell>
-                    <TableCell>{row.usage || '–'}</TableCell>
-                    <TableCell>{getStatusBadge(row.resultIndicator)}</TableCell>
-                    <TableCell>{row.threshold || '–'}</TableCell>
-                    <TableCell className="max-w-xs truncate" title={row.citation || ''}>{row.citation || '–'}</TableCell>
-                    <TableCell>{row.idType || '–'}</TableCell>
-                    <TableCell>{row.idValue || '–'}</TableCell>
-                    <TableCell>{row.decernisName || '–'}</TableCell>
-                    <TableCell>{row.function || '–'}</TableCell>
-                    <TableCell>
-                      {row.hyperlink && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={row.hyperlink} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {paginatedData.map((row, index) => {
+                  const ingredientName = row.name || row.spec || '–';
+                  return (
+                    <TableRow key={`${row.customerId}-${row.country}-${row.usage}-${index}`}>
+                      <TableCell className="font-medium">{ingredientName}</TableCell>
+                      <TableCell>{row.country || '–'}</TableCell>
+                      <TableCell>{row.usage || '–'}</TableCell>
+                      <TableCell>{getStatusBadge(row.resultIndicator)}</TableCell>
+                      <TableCell>{row.threshold || '–'}</TableCell>
+                      <TableCell>{row.regulation || '–'}</TableCell>
+                      <TableCell className="max-w-xs truncate" title={row.citation || ''}>{row.citation || '–'}</TableCell>
+                      <TableCell>{row.idType || '–'}</TableCell>
+                      <TableCell>{row.idValue || '–'}</TableCell>
+                      <TableCell>{row.decernisName || '–'}</TableCell>
+                      <TableCell>{row.function || '–'}</TableCell>
+                      <TableCell>
+                        {row.hyperlink && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a href={row.hyperlink} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-muted-foreground">Rows per page:</span>
-              <Select
-                value={pageSize.toString()}
-                onValueChange={(value) => {
-                  setPageSize(Number(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-20">
+              <span>Rows per page:</span>
+              <Select value={pageSize === 'all' ? 'all' : String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-8 w-[132px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
+                  {[10, 25, 50, 100].map(size => (
+                    <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                  ))}
+                  <SelectItem value="all">Show all</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:space-x-3">
+              <span>
+                Showing {paginatedData.length} of {filteredAndSortedData.length}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
+              {pageSize !== 'all' && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span>Page {currentPage} of {totalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
