@@ -18,7 +18,7 @@ const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_INGREDIENT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
-export const DEFAULT_RECIPE_ENDPOINT = `${API_BASE_URL}/v5/recipe-analysis/transaction?report=tabular`;
+export const DEFAULT_RECIPE_ENDPOINT = `${API_BASE_URL}/v5/recipe-analysis/transaction`;
 // Settings management
 export const getSettings = (): Partial<AppSettings> => {
   return {

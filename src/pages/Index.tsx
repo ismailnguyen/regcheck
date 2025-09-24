@@ -166,6 +166,148 @@ const computeIngredientResults = (body: unknown): { results: ReportRow[]; summar
   return { results, summary };
 };
 
+const extractNotListedMatrixRows = (source: unknown, existingKeys: Set<string>): ReportRow[] => {
+  const collected: Record<string, unknown>[] = [];
+
+  const visit = (value: unknown) => {
+    if (!value) {
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!isRecord(value)) {
+      return;
+    }
+
+    const indicatorRaw = value.resultIndicator ?? value.status ?? value.listingStatus ?? value.indicator;
+    if (typeof indicatorRaw === "string") {
+      const normalizedIndicator = indicatorRaw.replace(/_/g, " ").trim().toUpperCase();
+      if (normalizedIndicator.includes("NOT") && normalizedIndicator.includes("LISTED")) {
+        collected.push(value);
+      }
+    }
+
+    Object.values(value).forEach(visit);
+  };
+
+  visit(source);
+
+  const rows: ReportRow[] = [];
+
+  const toStringValue = (entry: Record<string, unknown>, keys: string[], fallback?: string): string => {
+    for (const key of keys) {
+      const raw = entry[key];
+      if (typeof raw === "string" && raw.trim()) {
+        return raw.trim();
+      }
+      if (Array.isArray(raw)) {
+        const flattened = raw
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter(Boolean)
+          .join(", ");
+        if (flattened) {
+          return flattened;
+        }
+      }
+    }
+    return fallback ?? "";
+  };
+
+  const toNumberValue = (entry: Record<string, unknown>, keys: string[]): number | null => {
+    for (const key of keys) {
+      const raw = entry[key];
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        return raw;
+      }
+      if (typeof raw === "string" && raw.trim()) {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  };
+
+  const toObjectMap = (entry: Record<string, unknown>, keys: string[]): Record<string, string> | null => {
+    for (const key of keys) {
+      const raw = entry[key];
+      if (isRecord(raw)) {
+        const normalized: Record<string, string> = {};
+        Object.entries(raw).forEach(([mapKey, mapValue]) => {
+          if (typeof mapValue === "string" && mapValue.trim()) {
+            normalized[mapKey] = mapValue.trim();
+          }
+        });
+        if (Object.keys(normalized).length > 0) {
+          return normalized;
+        }
+      }
+    }
+    return null;
+  };
+
+  collected.forEach((entry) => {
+    const record = entry as Record<string, unknown>;
+    const name = toStringValue(record, [
+      "ingredientName",
+      "ingredient",
+      "name",
+      "customerName",
+      "customerId",
+      "idValue",
+      "description",
+    ], "Unknown Ingredient");
+
+    const country = toStringValue(record, ["country", "countryName", "countries", "jurisdiction"], "");
+    const usage = toStringValue(record, ["usage", "usageName", "application", "applications", "category"], "");
+
+    const key = `${name}::${country}::${usage}::NOT LISTED`.toLowerCase();
+    if (existingKeys.has(key)) {
+      return;
+    }
+
+    const idValue = toStringValue(record, ["idValue", "identifier", "ingredientId", "decernisId"], name);
+    const idType = toStringValue(record, ["idType", "identifierType"], "Not Listed");
+    const functionValue = toStringValue(record, ["function", "role", "functionality"], "");
+    const decernisName = toStringValue(record, ["decernisName", "decernisIngredientName"], "");
+    const threshold = toStringValue(record, ["threshold", "limit", "maximumLevel"], "");
+    const citation = toStringValue(record, ["citation", "reference", "legalCitation"], "");
+    const regulation = toStringValue(record, ["regulation", "regulationName", "regulationReference"], "");
+    const hyperlink = toStringValue(record, ["hyperlink", "link", "url"], "");
+    const percentage = toNumberValue(record, ["percentage", "concentration"]);
+    const otherIdentifiers = toObjectMap(record, ["otherIdentifiers", "identifiers"]);
+
+    const normalizedRow: ReportRow = {
+      customerId: name,
+      customerName: name,
+      idType: idType || "Not Listed",
+      idValue: idValue || name,
+      decernisName: decernisName || null,
+      country,
+      usage,
+      function: functionValue ? functionValue : null,
+      resultIndicator: "NOT LISTED",
+      threshold: threshold || null,
+      citation: citation || null,
+      color: null,
+      comments: null,
+      hyperlink: hyperlink || null,
+      percentage: percentage ?? null,
+      spec: null,
+      regulation: regulation || null,
+      otherIdentifiers,
+    };
+
+    existingKeys.add(key);
+    rows.push(normalizedRow);
+  });
+
+  return rows;
+};
+
 const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: ResultSummary } => {
   if (!isRecord(body)) {
     throw new Error("Response body must be a JSON object");
@@ -178,6 +320,7 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
         resultIndicator?: string;
         tabularReport?: ReportRow[];
       }>;
+      matrixReport?: unknown;
     };
   } & {
     recipeAnalysisReport?: {
@@ -186,6 +329,7 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
         resultIndicator?: string;
         tabularReport?: ReportRow[];
       }>;
+      matrixReport?: unknown;
     };
   };
 
@@ -210,6 +354,14 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
       ...row,
       resultIndicator: row.resultIndicator || "UNKNOWN",
     }));
+  }
+
+  const existingKeys = new Set(results.map((row) => `${row.customerName}::${row.country || ""}::${row.usage || ""}::${row.resultIndicator}`.toLowerCase()));
+
+  const matrixSource = recipeReportContainer?.matrixReport ?? (apiResponse as { recipeMatrixReport?: unknown }).recipeMatrixReport;
+  const notListedRows = extractNotListedMatrixRows(matrixSource ?? apiResponse, existingKeys);
+  if (notListedRows.length > 0) {
+    results = [...results, ...notListedRows];
   }
 
   if (results.length === 0) {
