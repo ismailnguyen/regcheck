@@ -167,7 +167,7 @@ export function SettingsDialog({ open, onOpenChange, onSave }: SettingsDialogPro
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Your API key is stored locally in your browser and never transmitted to our servers.
+              Your API key is kept in your browser. Validation requests forward it to the Decernis API through a transient Netlify function and it is never stored on our servers.
             </p>
           </div>
 

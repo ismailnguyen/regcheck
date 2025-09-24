@@ -10,6 +10,7 @@ interface DebugPanelProps {
   request: DebugRequestInfo;
   response?: DebugResponseInfo;
   errorMessage?: string;
+  jobId?: string;
   payloadText: string;
   onPayloadTextChange: (value: string) => void;
   payloadError?: string | null;
@@ -38,6 +39,7 @@ export function DebugPanel({
   request,
   response,
   errorMessage,
+  jobId,
   payloadText,
   onPayloadTextChange,
   payloadError,
@@ -66,6 +68,9 @@ export function DebugPanel({
             <div className="text-sm space-y-1">
               <p><span className="font-medium">Method:</span> {request.method}</p>
               <p className="break-words"><span className="font-medium">URL:</span> {request.url}</p>
+              {jobId && (
+                <p className="break-words"><span className="font-medium">Job ID:</span> {jobId}</p>
+              )}
             </div>
             <div className="rounded-md border bg-muted/30 p-3">
               <div className="mb-2 flex items-center justify-between">

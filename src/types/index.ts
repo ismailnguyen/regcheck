@@ -123,6 +123,7 @@ export interface DebugInfo {
   request: DebugRequestInfo;
   response: DebugResponseInfo;
   errorMessage?: string;
+  jobId?: string;
 }
 
 export interface RecipeIngredientInput extends IngredientInput {

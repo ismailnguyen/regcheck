@@ -10,8 +10,6 @@ import { ValidationHistory } from "@/components/ValidationHistory";
 import {
   getSettings,
   storeIngredient,
-  DEFAULT_INGREDIENT_ENDPOINT,
-  DEFAULT_RECIPE_ENDPOINT,
   getIngredientValidationHistory,
   saveIngredientValidationResult,
   getRecipeValidationHistory,
@@ -19,6 +17,13 @@ import {
   deleteIngredientValidationResult,
   deleteRecipeValidationResult,
 } from "@/lib/storage";
+import {
+  runValidationJob,
+  DECERNIS_API_BASE_URL,
+  INGREDIENT_ENDPOINT_PATH,
+  RECIPE_ENDPOINT_PATH,
+  type ValidationJobRecord,
+} from "@/lib/regcheck-jobs";
 import { toast } from "@/hooks/use-toast";
 import type {
   Country,
@@ -1005,79 +1010,53 @@ const Index = () => {
       return;
     }
 
-    const endpoint = DEFAULT_INGREDIENT_ENDPOINT;
     const debugEnabled = Boolean(settings.debugMode);
-
     const requestPayload = ingredientRequestPayload;
+    const upstreamUrl = `${DECERNIS_API_BASE_URL}${INGREDIENT_ENDPOINT_PATH}`;
 
     const requestInfo = {
       method: "POST",
-      url: endpoint,
+      url: upstreamUrl,
       payload: requestPayload,
     };
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (settings.apiKey) {
-      headers.Authorization = `Bearer ${settings.apiKey}`;
-      headers["x-api-key"] = settings.apiKey;
-    }
-
     setIngredientIsRunning(true);
     setIngredientDebugInfo(null);
-    const requestStartedAt = Date.now();
+
+    let jobRecord: ValidationJobRecord | null = null;
     let responseBody: unknown = null;
     let responseStatus = 0;
     let responseStatusText = "";
     let responseWeightBytes: number | undefined;
 
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestPayload),
+      jobRecord = await runValidationJob({
+        endpointPath: INGREDIENT_ENDPOINT_PATH,
+        payload: requestPayload,
+        apiKey: settings.apiKey,
+        metadata: {
+          scenarioName: ingredientScenarioName || undefined,
+          type: "ingredient",
+        },
       });
 
-      responseStatus = response.status;
-      responseStatusText = response.statusText;
+      responseStatus = jobRecord.result?.status ?? 0;
+      responseStatusText = jobRecord.result?.statusText ?? "";
+      responseWeightBytes = jobRecord.result?.weightBytes;
 
-      const responseText = await response.text();
-      if (responseText) {
-        responseWeightBytes = typeof TextEncoder !== "undefined"
-          ? new TextEncoder().encode(responseText).length
-          : responseText.length;
+      if (jobRecord.status === "failed") {
+        responseBody = jobRecord.error?.details ?? jobRecord.result?.body ?? null;
+        throw new Error(jobRecord.error?.message || "Validation job failed");
       }
 
-      let parsedBody: unknown = null;
-      if (responseText) {
-        try {
-          parsedBody = JSON.parse(responseText);
-        } catch {
-          parsedBody = null;
-        }
-      }
+      const body = jobRecord.result?.body;
+      responseBody = body ?? jobRecord.result?.rawBody ?? null;
 
-      responseBody = parsedBody ?? (responseText || null);
-
-      if (!response.ok) {
-        let message = `Request failed with status ${response.status}`;
-        if (
-          parsedBody &&
-          typeof parsedBody === "object" &&
-          (parsedBody as { message?: unknown }).message &&
-          typeof (parsedBody as { message?: unknown }).message === "string"
-        ) {
-          message = (parsedBody as { message: string }).message;
-        }
-        throw new Error(message);
-      }
-
-      if (!parsedBody || typeof parsedBody !== "object") {
+      if (!body || typeof body !== "object") {
         throw new Error("Unexpected API response format");
       }
 
-      const { results: normalizedResults, summary } = computeIngredientResults(parsedBody);
+      const { results: normalizedResults, summary } = computeIngredientResults(body);
 
       ingredientItems.forEach(ingredient => {
         storeIngredient(ingredient);
@@ -1093,8 +1072,13 @@ const Index = () => {
           : "The API call completed successfully but returned no results.",
       });
 
+      const computedDuration = jobRecord.metrics?.durationMs ?? Math.max(
+        0,
+        new Date(jobRecord.updatedAt).getTime() - new Date(jobRecord.startedAt).getTime(),
+      );
+
       const metrics: ValidationRunMetrics = {
-        durationMs: Date.now() - requestStartedAt,
+        durationMs: computedDuration,
         status: responseStatus,
         statusText: responseStatusText || undefined,
         weightBytes: responseWeightBytes,
@@ -1131,8 +1115,9 @@ const Index = () => {
             status: responseStatus,
             statusText: responseStatusText,
             weightBytes: responseWeightBytes,
-            body: responseBody ?? {},
+            body: body,
           },
+          jobId: jobRecord.jobId,
         });
       }
     } catch (error) {
@@ -1144,7 +1129,10 @@ const Index = () => {
       });
 
       if (debugEnabled) {
-        const durationMs = Date.now() - requestStartedAt;
+        const durationMs = jobRecord?.metrics?.durationMs ?? (jobRecord
+          ? Math.max(0, new Date(jobRecord.updatedAt).getTime() - new Date(jobRecord.startedAt).getTime())
+          : 0);
+
         setIngredientDebugInfo({
           request: requestInfo,
           response: {
@@ -1155,6 +1143,7 @@ const Index = () => {
             body: responseBody ?? { message: errorMessage },
           },
           errorMessage,
+          jobId: jobRecord?.jobId,
         });
       }
     } finally {
@@ -1174,7 +1163,6 @@ const Index = () => {
       return;
     }
 
-    const endpoint = DEFAULT_RECIPE_ENDPOINT;
     const debugEnabled = Boolean(settings.debugMode);
 
     const recipeName = recipeScenarioName || "Untitled Recipe";
@@ -1184,72 +1172,46 @@ const Index = () => {
 
     const requestInfo = {
       method: "POST",
-      url: endpoint,
+      url: `${DECERNIS_API_BASE_URL}${RECIPE_ENDPOINT_PATH}`,
       payload: requestPayload,
     };
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (settings.apiKey) {
-      headers.Authorization = `Bearer ${settings.apiKey}`;
-      headers["x-api-key"] = settings.apiKey;
-    }
-
     setRecipeIsRunning(true);
     setRecipeDebugInfo(null);
-    const requestStartedAt = Date.now();
+    let jobRecord: ValidationJobRecord | null = null;
     let responseBody: unknown = null;
     let responseStatus = 0;
     let responseStatusText = "";
     let responseWeightBytes: number | undefined;
 
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(requestPayload),
+      jobRecord = await runValidationJob({
+        endpointPath: RECIPE_ENDPOINT_PATH,
+        payload: requestPayload,
+        apiKey: settings.apiKey,
+        metadata: {
+          scenarioName: recipeScenarioName || undefined,
+          type: "recipe",
+        },
       });
 
-      responseStatus = response.status;
-      responseStatusText = response.statusText;
+      responseStatus = jobRecord.result?.status ?? 0;
+      responseStatusText = jobRecord.result?.statusText ?? "";
+      responseWeightBytes = jobRecord.result?.weightBytes;
 
-      const responseText = await response.text();
-      if (responseText) {
-        responseWeightBytes = typeof TextEncoder !== "undefined"
-          ? new TextEncoder().encode(responseText).length
-          : responseText.length;
+      if (jobRecord.status === "failed") {
+        responseBody = jobRecord.error?.details ?? jobRecord.result?.body ?? null;
+        throw new Error(jobRecord.error?.message || "Recipe validation failed");
       }
 
-      let parsedBody: unknown = null;
-      if (responseText) {
-        try {
-          parsedBody = JSON.parse(responseText);
-        } catch {
-          parsedBody = null;
-        }
-      }
+      const body = jobRecord.result?.body;
+      responseBody = body ?? jobRecord.result?.rawBody ?? null;
 
-      responseBody = parsedBody ?? (responseText || null);
-
-      if (!response.ok) {
-        let message = `Request failed with status ${response.status}`;
-        if (
-          parsedBody &&
-          typeof parsedBody === "object" &&
-          (parsedBody as { message?: unknown }).message &&
-          typeof (parsedBody as { message?: unknown }).message === "string"
-        ) {
-          message = (parsedBody as { message: string }).message;
-        }
-        throw new Error(message);
-      }
-
-      if (!parsedBody || typeof parsedBody !== "object") {
+      if (!body || typeof body !== "object") {
         throw new Error("Unexpected API response format");
       }
 
-      const { results: normalizedResults, summary } = computeRecipeResults(parsedBody);
+      const { results: normalizedResults, summary } = computeRecipeResults(body);
 
       recipeIngredients.forEach(({ percentage: _percentage, function: _function, spec: _spec, ...base }) => {
         storeIngredient(base);
@@ -1265,8 +1227,13 @@ const Index = () => {
           : "The API call completed successfully but returned no results.",
       });
 
+      const computedDuration = jobRecord.metrics?.durationMs ?? Math.max(
+        0,
+        new Date(jobRecord.updatedAt).getTime() - new Date(jobRecord.startedAt).getTime(),
+      );
+
       const metrics: ValidationRunMetrics = {
-        durationMs: Date.now() - requestStartedAt,
+        durationMs: computedDuration,
         status: responseStatus,
         statusText: responseStatusText || undefined,
         weightBytes: responseWeightBytes,
@@ -1304,8 +1271,9 @@ const Index = () => {
             status: responseStatus,
             statusText: responseStatusText,
             weightBytes: responseWeightBytes,
-            body: responseBody ?? {},
+            body: body,
           },
+          jobId: jobRecord.jobId,
         });
       }
     } catch (error) {
@@ -1317,7 +1285,10 @@ const Index = () => {
       });
 
       if (debugEnabled) {
-        const durationMs = Date.now() - requestStartedAt;
+        const durationMs = jobRecord?.metrics?.durationMs ?? (jobRecord
+          ? Math.max(0, new Date(jobRecord.updatedAt).getTime() - new Date(jobRecord.startedAt).getTime())
+          : 0);
+
         setRecipeDebugInfo({
           request: requestInfo,
           response: {
@@ -1328,6 +1299,7 @@ const Index = () => {
             body: responseBody ?? { message: errorMessage },
           },
           errorMessage,
+          jobId: jobRecord?.jobId,
         });
       }
     } finally {
@@ -1354,7 +1326,9 @@ const Index = () => {
     ? handleIngredientResponseTextChange
     : handleRecipeResponseTextChange;
   const currentRequestPayload = activeMode === "ingredients" ? ingredientRequestPayload : recipeRequestPayload;
-  const currentEndpoint = activeMode === "ingredients" ? DEFAULT_INGREDIENT_ENDPOINT : DEFAULT_RECIPE_ENDPOINT;
+  const currentEndpoint = activeMode === "ingredients"
+    ? `${DECERNIS_API_BASE_URL}${INGREDIENT_ENDPOINT_PATH}`
+    : `${DECERNIS_API_BASE_URL}${RECIPE_ENDPOINT_PATH}`;
   const defaultRequestInfo: DebugRequestInfo = {
     method: "POST",
     url: currentEndpoint,
@@ -1465,6 +1439,7 @@ const Index = () => {
                     request={displayedRequestInfo}
                     response={currentDebugInfo?.response}
                     errorMessage={currentDebugInfo?.errorMessage}
+                    jobId={currentDebugInfo?.jobId}
                     payloadText={currentPayloadText}
                     onPayloadTextChange={handlePayloadTextChange}
                     payloadError={currentPayloadError}
