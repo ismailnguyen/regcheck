@@ -39,6 +39,10 @@ export interface JobRecord {
 const STORE_NAME = "regcheck-jobs";
 const FALLBACK_DIR = path.join(os.tmpdir(), "regcheck-jobs");
 const FALLBACK_FILE_PATH = path.join(FALLBACK_DIR, `${STORE_NAME}.json`);
+const IS_NETLIFY_ENV = process.env.NETLIFY === "true";
+const IS_LOCAL_DEV = process.env.NETLIFY_LOCAL === "true"
+  || process.env.NETLIFY_DEV === "true"
+  || (!IS_NETLIFY_ENV && process.env.NODE_ENV !== "production");
 
 type LambdaConnectEvent = {
   blobs?: string | null;
@@ -224,13 +228,15 @@ const resolveStore = (): JsonStore => {
     jobStore = createBlobStore();
     return jobStore;
   } catch (error) {
+    if (!IS_LOCAL_DEV) {
+      const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      throw new Error(`Failed to initialize Netlify Blobs store (${reason}). Ensure the site has Blobs enabled.`);
+    }
+
     if (!hasLoggedFallbackWarning) {
       const message = error instanceof Error ? error.message : String(error);
-      const isMissingEnv = error instanceof Error && error.name === "MissingBlobsEnvironmentError";
       const prefix = "Falling back to local job store";
-      const suffix = isMissingEnv
-        ? `Netlify Blobs environment variables are not configured. Jobs will be persisted to ${FALLBACK_DIR} during local development.`
-        : message;
+      const suffix = `Reason: ${message}. Persisting jobs to ${FALLBACK_DIR}.`;
       console.info(`${prefix}: ${suffix}`);
       hasLoggedFallbackWarning = true;
     }
