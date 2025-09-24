@@ -310,6 +310,23 @@ export const deleteJobRecord = async (jobId: string): Promise<void> => {
   await store.delete(jobId);
 };
 
+export const deleteAllJobRecords = async (): Promise<number> => {
+  const store = resolveStore();
+  const keys = await store.listKeys();
+  let deleted = 0;
+
+  for (const key of keys) {
+    try {
+      await store.delete(key);
+      deleted += 1;
+    } catch (error) {
+      console.warn(`Failed to delete job record '${key}':`, error);
+    }
+  }
+
+  return deleted;
+};
+
 export const listJobRecords = async (): Promise<JobRecord[]> => {
   const store = resolveStore();
   const keys = await store.listKeys();

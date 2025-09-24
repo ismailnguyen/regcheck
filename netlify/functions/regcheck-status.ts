@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { initializeJobStoreContext, readJobRecord } from "./_shared/job-store";
+import { deleteJobRecord, initializeJobStoreContext, readJobRecord } from "./_shared/job-store";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,6 +43,16 @@ const handler: Handler = async (event) => {
       headers: corsHeaders,
       body: JSON.stringify({ message: "Job not found", jobId }),
     };
+  }
+
+  const shouldDelete = record.status === "completed" || record.status === "failed";
+
+  if (shouldDelete) {
+    try {
+      await deleteJobRecord(jobId);
+    } catch (error) {
+      console.warn(`Failed to delete job record '${jobId}' after completion:`, error);
+    }
   }
 
   return {
