@@ -1396,6 +1396,10 @@ const Index = () => {
     ? "Ingredients Validation Results"
     : "Recipe Validation Results";
 
+  const currentResultsTitle = activeMode === "recipe"
+    ? (recipeScenarioName.trim() || "Untitled Recipe")
+    : undefined;
+
   const runActiveValidation = () => {
     if (activeMode === "ingredients") {
       void runIngredientValidation();
@@ -1430,6 +1434,7 @@ const Index = () => {
                     data={currentResults}
                     summary={currentSummary}
                     isLoading={currentIsRunning}
+                    title={currentResultsTitle}
                   />
                 </div>
               )}

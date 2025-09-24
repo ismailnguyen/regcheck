@@ -4,6 +4,8 @@
 
 [build.environment]
   VITE_DECERNIS_API_BASE_URL = "/.netlify/functions/decernis-proxy"
+  NODE_VERSION = "20"
+  NPM_VERSION = "9.9.3"
 
 [dev]
   command = "npm run dev"

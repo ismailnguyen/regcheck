@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { ArrowUpDown, ExternalLink, Filter } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ interface ResultsTableProps {
   data: ReportRow[];
   summary?: ResultSummary;
   isLoading?: boolean;
+  title?: string;
 }
 
 type SortField = keyof ReportRow;
@@ -50,7 +51,7 @@ const TABLE_COLUMNS: ColumnDefinition[] = [
   { key: 'function', label: 'Function', filterable: true },
 ];
 
-export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
+export function ResultsTable({ data, summary, isLoading, title }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -133,6 +134,20 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
     ? 1
     : Math.max(1, Math.ceil(filteredAndSortedData.length / pageSize));
 
+  const resultsCountLabel = `Results (${filteredAndSortedData.length} total)`;
+
+  const renderTitleBlock = (showCount: boolean) => {
+    const heading = title ?? (showCount ? resultsCountLabel : 'Results');
+    const description = title ? (showCount ? resultsCountLabel : 'Results') : undefined;
+
+    return (
+      <div className="space-y-1">
+        <CardTitle>{heading}</CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
+      </div>
+    );
+  };
+
   const getStatusBadge = (indicator: string) => {
     const status = indicator.toUpperCase();
     const variants = {
@@ -154,7 +169,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Results</CardTitle>
+          {renderTitleBlock(false)}
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
@@ -172,7 +187,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Results</CardTitle>
+          {renderTitleBlock(false)}
         </CardHeader>
         <CardContent>
           <div className="text-center py-12 text-muted-foreground">
@@ -201,10 +216,10 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Results ({filteredAndSortedData.length} total)</span>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {renderTitleBlock(true)}
           {summary && (
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               {Object.entries(summary.countsByIndicator).map(([status, count]) => (
                 <Badge key={status} variant="outline" className="text-xs">
                   {status}: {count}
@@ -212,7 +227,7 @@ export function ResultsTable({ data, summary, isLoading }: ResultsTableProps) {
               ))}
             </div>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
