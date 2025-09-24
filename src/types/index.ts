@@ -88,6 +88,13 @@ export interface ValidationScenarioSnapshot {
   spec?: string;
 }
 
+export interface ValidationRunMetrics {
+  durationMs: number;
+  status: number;
+  statusText?: string;
+  weightBytes?: number;
+}
+
 export interface ValidationResultRecord {
   id: string;
   name: string;
@@ -95,6 +102,7 @@ export interface ValidationResultRecord {
   summary: ResultSummary;
   results: ReportRow[];
   scenario: ValidationScenarioSnapshot;
+  metrics?: ValidationRunMetrics;
 }
 
 export interface DebugRequestInfo {

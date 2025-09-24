@@ -32,6 +32,7 @@ import type {
   AppSettings,
   ApiResponse,
   ValidationResultRecord,
+  ValidationRunMetrics,
   IdType,
 } from "@/types";
 import { ID_TYPES } from "@/types";
@@ -940,6 +941,13 @@ const Index = () => {
           : "The API call completed successfully but returned no results.",
       });
 
+      const metrics: ValidationRunMetrics = {
+        durationMs: Date.now() - requestStartedAt,
+        status: responseStatus,
+        statusText: responseStatusText || undefined,
+        weightBytes: responseWeightBytes,
+      };
+
       const recordName = ingredientScenarioName.trim() || `Scenario ${new Date().toLocaleString()}`;
       const record: ValidationResultRecord = {
         id: crypto.randomUUID(),
@@ -956,6 +964,7 @@ const Index = () => {
           usages: [...ingredientUsages],
           ingredients: ingredientItems.map((ingredient) => ({ ...ingredient })),
         },
+        metrics,
       };
 
       saveIngredientValidationResult(record);
@@ -963,11 +972,10 @@ const Index = () => {
       setSelectedIngredientHistoryId(record.id);
 
       if (debugEnabled) {
-        const durationMs = Date.now() - requestStartedAt;
         setIngredientDebugInfo({
           request: requestInfo,
           response: {
-            durationMs,
+            durationMs: metrics.durationMs,
             status: responseStatus,
             statusText: responseStatusText,
             weightBytes: responseWeightBytes,
@@ -1105,6 +1113,13 @@ const Index = () => {
           : "The API call completed successfully but returned no results.",
       });
 
+      const metrics: ValidationRunMetrics = {
+        durationMs: Date.now() - requestStartedAt,
+        status: responseStatus,
+        statusText: responseStatusText || undefined,
+        weightBytes: responseWeightBytes,
+      };
+
       const recordName = recipeScenarioName.trim() || `Recipe ${new Date().toLocaleString()}`;
       const record: ValidationResultRecord = {
         id: crypto.randomUUID(),
@@ -1122,6 +1137,7 @@ const Index = () => {
           ingredients: recipeIngredients.map((ingredient) => ({ ...ingredient })),
           spec: recipeSpecValue,
         },
+        metrics,
       };
 
       saveRecipeValidationResult(record);
@@ -1129,11 +1145,10 @@ const Index = () => {
       setSelectedRecipeHistoryId(record.id);
 
       if (debugEnabled) {
-        const durationMs = Date.now() - requestStartedAt;
         setRecipeDebugInfo({
           request: requestInfo,
           response: {
-            durationMs,
+            durationMs: metrics.durationMs,
             status: responseStatus,
             statusText: responseStatusText,
             weightBytes: responseWeightBytes,

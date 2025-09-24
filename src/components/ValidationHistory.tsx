@@ -22,12 +22,29 @@ const formatDate = (iso: string): string => {
   }
 };
 
+const formatDuration = (durationMs?: number): string => {
+  if (!Number.isFinite(durationMs)) {
+    return "N/A";
+  }
+  return `${Math.max(0, Number(durationMs)).toFixed(0)} ms`;
+};
+
+const formatWeight = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) {
+    return "N/A";
+  }
+  const kiloBytes = bytes / 1024;
+  const display = kiloBytes < 1 ? `${bytes} B` : `${kiloBytes.toFixed(2)} KB`;
+  return `${display} (${bytes} B)`;
+};
+
 export function ValidationHistory({ records, selectedRecordId, onSelectRecord, title = "Validation Results", onDeleteRecord }: ValidationHistoryProps) {
   const orderedRecords = useMemo(() => {
     return [...records].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }, [records]);
 
   const selectedRecord = orderedRecords.find(record => record.id === selectedRecordId) || orderedRecords[0];
+  const selectedMetrics = selectedRecord?.metrics;
 
   if (orderedRecords.length === 0) {
     return (
@@ -46,8 +63,8 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
         <span className="text-sm text-muted-foreground">{orderedRecords.length} saved run{orderedRecords.length === 1 ? "" : "s"}</span>
       </div>
 
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <div className="lg:w-72 flex-shrink-0 space-y-3">
+      <div className="flex flex-col gap-6 lg:flex-column">
+        <div className="flex-shrink-0 space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground">Runs</h3>
           <ScrollArea className="h-[360px] rounded-lg border p-2">
             <div className="space-y-2">
@@ -101,18 +118,22 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
                   ))}
                 </div>
               </div>
-              <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+              <div className="grid gap-1 text-sm text-muted-foreground grid-cols-1">
                 {selectedRecord.scenario.countries.length > 0 && (
-                  <span>Countries: {selectedRecord.scenario.countries.join(", ")}</span>
+                  <div className="sm:col-span-2 lg:col-span-3 mb-4">
+                    <u>Countries:</u> {selectedRecord.scenario.countries.join(", ")}
+                    </div>
                 )}
                 {selectedRecord.scenario.usages.length > 0 && (
-                  <span>Usages: {selectedRecord.scenario.usages.join(", ")}</span>
+                  <div className="sm:col-span-2 lg:col-span-3 mb-4">
+                    <u>Usages:</u> {selectedRecord.scenario.usages.join(", ")}
+                  </div>
                 )}
                 {selectedRecord.scenario.spec && (
-                  <span>Specification: {selectedRecord.scenario.spec}</span>
+                  <div><u>Specification:</u> {selectedRecord.scenario.spec}</div>
                 )}
-                <span className="sm:col-span-2">
-                  Ingredients: {selectedRecord.scenario.ingredients.length > 0
+                <div className="sm:col-span-2 lg:col-span-3 mb-4">
+                  <u>Ingredients:</u> {selectedRecord.scenario.ingredients.length > 0
                     ? selectedRecord.scenario.ingredients.map((ing) => {
                         const parts = [ing.name || ing.idValue || "Unnamed"];
                         if (typeof ing.percentage === "number") {
@@ -124,7 +145,13 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
                         return parts.join(" • ");
                       }).join(", ")
                     : "None"}
-                </span>
+                </div>
+                <div className="mt-6 col-span-3 grid gap-1 text-sm text-muted-foreground sm:grid-cols-3 lg:grid-cols-3 border rounded">
+                  <u className="col-span-3">Response performance:</u>
+                  <span>Response Status: {selectedMetrics ? `${selectedMetrics.status}${selectedMetrics.statusText ? ` (${selectedMetrics.statusText})` : ""}` : "Not captured"}</span>
+                  <span>Response Time: {selectedMetrics ? formatDuration(selectedMetrics.durationMs) : "Not captured"}</span>
+                  <span>Payload Weight: {selectedMetrics ? formatWeight(selectedMetrics.weightBytes) : "Not captured"}</span>
+                </div>
               </div>
             </div>
 
