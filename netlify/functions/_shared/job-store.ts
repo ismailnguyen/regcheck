@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { connectLambda, getStore } from "@netlify/blobs";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -40,6 +40,11 @@ const STORE_NAME = "regcheck-jobs";
 const FALLBACK_DIR = path.join(os.tmpdir(), "regcheck-jobs");
 const FALLBACK_FILE_PATH = path.join(FALLBACK_DIR, `${STORE_NAME}.json`);
 
+type LambdaConnectEvent = {
+  blobs?: string | null;
+  headers?: Record<string, string | string[] | undefined>;
+} | null | undefined;
+
 type BlobStore = {
   getJSON<T>(key: string): Promise<T | null>;
   setJSON<T>(key: string, value: T): Promise<void>;
@@ -55,6 +60,33 @@ type JsonStore = {
 };
 
 const memoryStore = new Map<string, unknown>();
+
+export const initializeJobStoreContext = (event: LambdaConnectEvent) => {
+  if (!event) {
+    return;
+  }
+
+  const token = typeof event.blobs === "string" && event.blobs ? event.blobs : null;
+  if (!token) {
+    return;
+  }
+
+  const headers: Record<string, string> = {};
+  const rawHeaders = event.headers ?? {};
+  for (const [key, value] of Object.entries(rawHeaders)) {
+    if (Array.isArray(value)) {
+      headers[key] = value.join(", ");
+    } else if (typeof value === "string") {
+      headers[key] = value;
+    }
+  }
+
+  try {
+    connectLambda({ blobs: token, headers });
+  } catch (error) {
+    console.warn("Failed to initialize Netlify Blobs context", error);
+  }
+};
 
 const createMemoryStore = (): JsonStore => ({
   async getJSON<T>(key: string) {
@@ -139,11 +171,42 @@ const createBlobStore = (): JsonStore => {
       }
 
       const keys: string[] = [];
-      for await (const entry of listMethod()) {
-        if (entry && typeof entry.key === "string") {
-          keys.push(entry.key);
+
+      const collectFromPage = (page: unknown) => {
+        if (!page || typeof page !== "object") {
+          return;
+        }
+        const blobs = (page as { blobs?: Array<{ key?: string }> }).blobs;
+        if (!Array.isArray(blobs)) {
+          return;
+        }
+        for (const blob of blobs) {
+          if (blob?.key) {
+            keys.push(blob.key);
+          }
+        }
+      };
+
+      try {
+        const iterable = listMethod({ paginate: true });
+        if (iterable && typeof (iterable as AsyncIterable<unknown>)[Symbol.asyncIterator] === "function") {
+          for await (const page of iterable as AsyncIterable<unknown>) {
+            collectFromPage(page);
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to iterate blobs store pages", error);
+      }
+
+      if (keys.length === 0) {
+        try {
+          const singlePage = await listMethod();
+          collectFromPage(singlePage);
+        } catch (error) {
+          console.warn("Failed to list blobs store entries", error);
         }
       }
+
       return keys;
     },
   };

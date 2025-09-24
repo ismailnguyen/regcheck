@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { mergeJobRecord } from "./_shared/job-store";
+import { initializeJobStoreContext, mergeJobRecord } from "./_shared/job-store";
 
 const ALLOWED_FORWARD_HEADERS = [
   "authorization",
@@ -44,6 +44,8 @@ const handler: Handler = async (event) => {
       body: JSON.stringify({ message: "Method not allowed" }),
     };
   }
+
+  initializeJobStoreContext(event);
 
   let body: StartRequestBody;
   try {

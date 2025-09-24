@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { readJobRecord } from "./_shared/job-store";
+import { initializeJobStoreContext, readJobRecord } from "./_shared/job-store";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +22,8 @@ const handler: Handler = async (event) => {
       body: JSON.stringify({ message: "Method not allowed" }),
     };
   }
+
+  initializeJobStoreContext(event);
 
   const jobId = event.queryStringParameters?.jobId?.trim();
 

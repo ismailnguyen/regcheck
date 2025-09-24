@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { mergeJobRecord } from "./_shared/job-store";
+import { initializeJobStoreContext, mergeJobRecord } from "./_shared/job-store";
 
 const API_BASE = "https://api.decernis.com";
 const ALLOWED_FORWARD_HEADERS = [
@@ -35,6 +35,8 @@ const getHeader = (event: Parameters<Handler>[0], name: string): string | undefi
 };
 
 const handler: Handler = async (event) => {
+  initializeJobStoreContext(event);
+
   let body: BackgroundRequestBody;
   try {
     body = JSON.parse(event.body ?? "{}");
