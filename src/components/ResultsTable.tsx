@@ -59,6 +59,56 @@ const PERCENTAGE_COLUMN: ColumnDefinition = {
   filterable: false,
 };
 
+const pickFirstValue = (...values: Array<unknown>): string | null => {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value.toString();
+    }
+  }
+  return null;
+};
+
+const resolveIngredientName = (row: ReportRow): string => {
+  const rowWithOptionalName = row as ReportRow & { name?: string | null };
+  return (
+    pickFirstValue(
+      rowWithOptionalName.name,
+      row.spec,
+      row.customerName,
+      row.decernisName,
+      row.customerId,
+      row.idValue,
+    ) ?? ''
+  );
+};
+
+const getFilterableTextValue = (row: ReportRow, columnKey: keyof ReportRow): string => {
+  if (columnKey === 'customerName') {
+    return resolveIngredientName(row);
+  }
+
+  const rawValue = row[columnKey];
+  if (rawValue === undefined || rawValue === null) {
+    return '';
+  }
+
+  if (typeof rawValue === 'string') {
+    return rawValue;
+  }
+
+  if (typeof rawValue === 'number') {
+    return Number.isFinite(rawValue) ? rawValue.toString() : '';
+  }
+
+  return String(rawValue);
+};
+
 export function ResultsTable({ data, summary, isLoading, title, showPercentage }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -104,15 +154,17 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
           return true;
         }
 
+        const normalizedFilterValue = filterValue.trim().toLowerCase();
+        if (!normalizedFilterValue) {
+          return true;
+        }
+
         if (!visibleColumnKeys.has(columnKey as keyof ReportRow)) {
           return true;
         }
 
-        const rawValue = row[columnKey as keyof ReportRow];
-        const cellValue = rawValue === undefined || rawValue === null
-          ? ''
-          : String(rawValue).toLowerCase();
-        return cellValue.includes(filterValue.toLowerCase());
+        const candidateValue = getFilterableTextValue(row, columnKey as keyof ReportRow).toLowerCase();
+        return candidateValue.includes(normalizedFilterValue);
       });
     });
 
@@ -136,11 +188,8 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
       }
       const values = new Set<string>();
       data.forEach((row) => {
-        const raw = row[column.key as keyof ReportRow];
-        if (raw === undefined || raw === null) {
-          return;
-        }
-        const normalized = String(raw).trim();
+        const raw = getFilterableTextValue(row, column.key);
+        const normalized = raw.trim();
         if (normalized) {
           values.add(normalized);
         }
@@ -193,21 +242,6 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
     );
   };
 
-  const pickFirstValue = (...values: Array<unknown>): string | null => {
-    for (const value of values) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          return trimmed;
-        }
-      }
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value.toString();
-      }
-    }
-    return null;
-  };
-
   const formatTextValue = (value: unknown): string => {
     if (value === null || value === undefined) {
       return '–';
@@ -258,15 +292,8 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
 
   const renderCellContent = (columnKey: keyof ReportRow, row: ReportRow) => {
     if (columnKey === 'customerName') {
-      const rowWithOptionalName = row as ReportRow & { name?: string | null };
-      return pickFirstValue(
-        rowWithOptionalName.name,
-        row.spec,
-        row.customerName,
-        row.decernisName,
-        row.customerId,
-        row.idValue,
-      ) ?? '–';
+      const resolvedName = resolveIngredientName(row);
+      return resolvedName || '–';
     }
 
     if (columnKey === 'resultIndicator') {
