@@ -117,8 +117,8 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
     if (!Number.isFinite(ingredient.percentage)) {
       return "Percentage is required";
     }
-    if (ingredient.percentage <= 0 || ingredient.percentage > MAX_PERCENTAGE) {
-      return `Percentage must be greater than 0 and at most ${MAX_PERCENTAGE}`;
+    if (ingredient.percentage > MAX_PERCENTAGE) {
+      return `Percentage must be at most ${MAX_PERCENTAGE}`;
     }
     return null;
   };
