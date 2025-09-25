@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { ArrowUpDown, ExternalLink, Filter } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { ArrowUpDown, ExternalLink, FileDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ReportRow, ResultSummary } from "@/types";
+import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
 
 interface ResultsTableProps {
   data: ReportRow[];
@@ -263,7 +264,7 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
     return Number(num.toFixed(4)).toString();
   };
 
-  const formatPercentageValue = (value: ReportRow['percentage']): string => {
+const formatPercentageValue = (value: ReportRow['percentage']): string => {
     if (value === null || value === undefined) {
       return '–';
     }
@@ -306,6 +307,70 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
 
     return formatTextValue(row[columnKey]);
   };
+
+  const formatValueForExport = (columnKey: keyof ReportRow, row: ReportRow): string => {
+    if (columnKey === 'customerName') {
+      return resolveIngredientName(row);
+    }
+
+    if (columnKey === 'resultIndicator') {
+      return row.resultIndicator?.toUpperCase?.() ?? '';
+    }
+
+    if (columnKey === 'percentage') {
+      const value = row.percentage;
+      if (value === null || value === undefined) {
+        return '';
+      }
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return toTrimmedNumberString(value);
+      }
+      if (typeof value === 'string') {
+        return value.trim();
+      }
+      return String(value);
+    }
+
+    const raw = row[columnKey];
+    if (raw === null || raw === undefined) {
+      return '';
+    }
+    if (typeof raw === 'string') {
+      return raw.trim();
+    }
+    if (typeof raw === 'number') {
+      return Number.isFinite(raw) ? raw.toString() : '';
+    }
+    return String(raw);
+  };
+
+  const exportRows = useMemo(() => {
+    return filteredAndSortedData.map((row) => {
+      const entry: Record<string, string> = {};
+      columns.forEach((column) => {
+        entry[column.label] = formatValueForExport(column.key, row);
+      });
+      entry.Link = row.hyperlink?.toString() ?? '';
+      return entry;
+    });
+  }, [columns, filteredAndSortedData]);
+
+  const handleExport = useCallback(() => {
+    if (exportRows.length === 0 || typeof window === 'undefined') {
+      return;
+    }
+
+    const worksheet = XLSXUtils.json_to_sheet(exportRows);
+    const workbook = XLSXUtils.book_new();
+    XLSXUtils.book_append_sheet(workbook, worksheet, 'Results');
+
+    const baseNameRaw = title?.trim() || 'regcheck-results';
+    const sanitizedBaseName = baseNameRaw.replace(/[\\/:*?"<>|]+/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${sanitizedBaseName}-${timestamp}.xlsx`;
+
+    writeXLSXFile(workbook, filename);
+  }, [exportRows, title]);
 
   if (isLoading) {
     return (
@@ -360,15 +425,27 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           {renderTitleBlock(true)}
-          {summary && (
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              {Object.entries(summary.countsByIndicator).map(([status, count]) => (
-                <Badge key={status} variant="outline" className="text-xs">
-                  {status}: {count}
-                </Badge>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            {summary && (
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                {Object.entries(summary.countsByIndicator).map(([status, count]) => (
+                  <Badge key={status} variant="outline" className="text-xs">
+                    {status}: {count}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exportRows.length === 0}
+              className="border-[#1e5d3a] bg-[#217346] text-white hover:bg-[#1e5d3a]"
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              Export to Excel
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

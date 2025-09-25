@@ -1396,7 +1396,7 @@ const Index = () => {
 
   const currentResultsTitle = activeMode === "recipe"
     ? (recipeScenarioName.trim() || "Untitled Recipe")
-    : undefined;
+    : (ingredientScenarioName.trim() || "Untitled Scenario");
 
   const scrollToTop = () => {
     if (typeof window !== "undefined") {

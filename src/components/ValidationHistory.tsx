@@ -161,6 +161,7 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
             <ResultsTable
               data={selectedRecord.results}
               summary={selectedRecord.summary}
+              title={selectedRecord.name}
               showPercentage={showPercentageColumn}
             />
           </div>
