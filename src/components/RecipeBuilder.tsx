@@ -117,8 +117,8 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
     if (!Number.isFinite(ingredient.percentage)) {
       return "Percentage is required";
     }
-    if (ingredient.percentage > MAX_PERCENTAGE) {
-      return `Percentage must be at most ${MAX_PERCENTAGE}`;
+    if (ingredient.percentage < MIN_PERCENTAGE || ingredient.percentage > MAX_PERCENTAGE) {
+      return `Percentage must be between ${MIN_PERCENTAGE} and ${MAX_PERCENTAGE}`;
     }
     return null;
   };
@@ -175,7 +175,7 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
                 <TableBody>
                   {ingredients.map((ingredient, index) => {
                     const error = getValidationError(ingredient);
-                    const percentageError = ingredient.percentage <= 0 || ingredient.percentage > MAX_PERCENTAGE;
+                    const percentageError = ingredient.percentage < MIN_PERCENTAGE || ingredient.percentage > MAX_PERCENTAGE;
                     return (
                       <TableRow key={ingredient.id} className={error ? "border-l-2 border-l-destructive" : ""}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
