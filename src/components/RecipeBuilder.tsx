@@ -37,9 +37,6 @@ interface RecipeBuilderProps {
   onIngredientsChange: (ingredients: RecipeIngredientInput[]) => void;
 }
 
-const MIN_PERCENTAGE = 0;
-const MAX_PERCENTAGE = 100;
-
 export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onIngredientsChange }: RecipeBuilderProps) {
   const [autoCompleteOpen, setAutoCompleteOpen] = useState<string | null>(null);
   const storedIngredients = getStoredIngredients();
@@ -117,9 +114,6 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
     if (!Number.isFinite(ingredient.percentage)) {
       return "Percentage is required";
     }
-    if (ingredient.percentage < MIN_PERCENTAGE || ingredient.percentage > MAX_PERCENTAGE) {
-      return `Percentage must be between ${MIN_PERCENTAGE} and ${MAX_PERCENTAGE}`;
-    }
     return null;
   };
 
@@ -129,7 +123,7 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">Recipe Ingredients</CardTitle>
           <div className="text-sm text-muted-foreground">
-            Total: <span className={totalPercentage > 100 ? "text-destructive font-semibold" : "font-medium"}>{totalPercentage.toFixed(2)}%</span>
+            Total: <span className="font-medium">{totalPercentage.toFixed(2)}%</span>
           </div>
         </div>
         <div className="flex flex-col space-y-3">
@@ -175,7 +169,7 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
                 <TableBody>
                   {ingredients.map((ingredient, index) => {
                     const error = getValidationError(ingredient);
-                    const percentageError = ingredient.percentage < MIN_PERCENTAGE || ingredient.percentage > MAX_PERCENTAGE;
+                    const percentageError = !Number.isFinite(ingredient.percentage);
                     return (
                       <TableRow key={ingredient.id} className={error ? "border-l-2 border-l-destructive" : ""}>
                         <TableCell className="font-medium">{index + 1}</TableCell>
@@ -257,8 +251,6 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
                           <Input
                             type="number"
                             step="0.01"
-                            min={MIN_PERCENTAGE}
-                            max={MAX_PERCENTAGE}
                             value={Number.isFinite(ingredient.percentage) ? ingredient.percentage : ""}
                             onChange={(e) => updateIngredient(ingredient.id, "percentage", Number.parseFloat(e.target.value) || 0)}
                             className={percentageError ? "border-destructive" : ""}
@@ -313,12 +305,6 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
                     return error ? <li key={ing.id}>Row {idx + 1}: {error}</li> : null;
                   })}
                 </ul>
-              </div>
-            )}
-
-            {totalPercentage > 100 && (
-              <div className="text-sm text-destructive">
-                Total percentage exceeds 100%. Adjust ingredient percentages.
               </div>
             )}
 

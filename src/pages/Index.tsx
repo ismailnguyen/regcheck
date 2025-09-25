@@ -572,9 +572,7 @@ const Index = () => {
     recipeCountries.length > 0 &&
     recipeUsages.length > 0 &&
     recipeIngredients.length > 0 &&
-    recipeInputsValid &&
-    recipeTotalPercentage > 0 &&
-    recipeTotalPercentage <= 100;
+    recipeInputsValid;
 
   const resetRecipeBuilder = () => {
     setRecipeScenarioName("");
