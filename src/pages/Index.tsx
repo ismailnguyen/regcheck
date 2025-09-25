@@ -564,8 +564,7 @@ const Index = () => {
     ing.name.trim() &&
     ing.idValue.trim() &&
     isValidIdValue(ing.idType, ing.idValue) &&
-    Number.isFinite(ing.percentage) &&
-    ing.percentage > 0
+    Number.isFinite(ing.percentage)
   );
 
   const recipeCanRun =
