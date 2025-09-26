@@ -479,7 +479,9 @@ const buildRecipePayload = (
 };
 
 const Index = () => {
+  // Default active tab/pane
   const [activeMode, setActiveMode] = useState<Mode>("recipe");
+
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Ingredient builder state

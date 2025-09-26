@@ -49,6 +49,7 @@ const BASE_TABLE_COLUMNS: ColumnDefinition[] = [
   { key: 'threshold', label: 'Restriction Level', filterable: true },
   { key: 'regulation', label: 'Regulation', filterable: true },
   { key: 'citation', label: 'Legal Quote', filterable: true, cellClassName: 'max-w-xs truncate' },
+  { key: 'comments', label: 'Comments', filterable: true, cellClassName: 'max-w-md whitespace-pre-wrap break-words text-sm' },
   { key: 'idType', label: 'ID Type', filterable: true },
   { key: 'idValue', label: 'ID Value', filterable: true },
   { key: 'decernisName', label: 'Decernis Name', filterable: true },
@@ -89,9 +90,21 @@ const resolveIngredientName = (row: ReportRow): string => {
   );
 };
 
+const getRowCommentText = (row: ReportRow): string => {
+  const text = row.comments?.comments;
+  if (typeof text === 'string') {
+    return text.trim();
+  }
+  return '';
+};
+
 const getFilterableTextValue = (row: ReportRow, columnKey: keyof ReportRow): string => {
   if (columnKey === 'customerName') {
     return resolveIngredientName(row);
+  }
+
+  if (columnKey === 'comments') {
+    return getRowCommentText(row);
   }
 
   const rawValue = row[columnKey];
@@ -226,8 +239,51 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
     );
   };
 
-  const getStatusBadge = (indicator: string) => {
-    const status = indicator.toUpperCase();
+  const normalizeHexColor = (value?: string | null): string | null => {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed)) {
+      return null;
+    }
+    if (trimmed.length === 4) {
+      const [r, g, b] = trimmed.slice(1).split('');
+      return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+    }
+    return trimmed.toUpperCase();
+  };
+
+  const getContrastingTextColor = (hexColor: string): string => {
+    try {
+      const normalized = hexColor.slice(1);
+      const r = parseInt(normalized.slice(0, 2), 16);
+      const g = parseInt(normalized.slice(2, 4), 16);
+      const b = parseInt(normalized.slice(4, 6), 16);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return luminance > 0.6 ? '#000000' : '#ffffff';
+    } catch {
+      return '#000000';
+    }
+  };
+
+  const getStatusBadge = (indicator: string, color?: string | null) => {
+    const normalizedStatus = typeof indicator === 'string' ? indicator.trim().toUpperCase() : '';
+    const displayLabel = normalizedStatus || '–';
+    const normalizedColor = normalizeHexColor(color);
+
+    if (normalizedColor) {
+      return (
+        <Badge
+          variant="secondary"
+          className="font-semibold"
+          style={{ backgroundColor: normalizedColor, color: getContrastingTextColor(normalizedColor), borderColor: normalizedColor }}
+        >
+          {displayLabel}
+        </Badge>
+      );
+    }
+
     const variants = {
       'ALLOWED': 'default',
       'PERMITTED': 'default',
@@ -235,10 +291,10 @@ export function ResultsTable({ data, summary, isLoading, title, showPercentage }
       'PROHIBITED': 'destructive',
       'RESTRICTED': 'outline',
     } as const;
-    
+
     return (
-      <Badge variant={variants[status as keyof typeof variants] || 'outline'}>
-        {status}
+      <Badge variant={variants[normalizedStatus as keyof typeof variants] || 'outline'}>
+        {displayLabel}
       </Badge>
     );
   };
@@ -298,7 +354,12 @@ const formatPercentageValue = (value: ReportRow['percentage']): string => {
     }
 
     if (columnKey === 'resultIndicator') {
-      return getStatusBadge(row.resultIndicator);
+      return getStatusBadge(row.resultIndicator, row.color);
+    }
+
+    if (columnKey === 'comments') {
+      const commentText = getRowCommentText(row);
+      return commentText || '–';
     }
 
     if (columnKey === 'percentage') {
@@ -315,6 +376,10 @@ const formatPercentageValue = (value: ReportRow['percentage']): string => {
 
     if (columnKey === 'resultIndicator') {
       return row.resultIndicator?.toUpperCase?.() ?? '';
+    }
+
+    if (columnKey === 'comments') {
+      return getRowCommentText(row);
     }
 
     if (columnKey === 'percentage') {
@@ -509,6 +574,13 @@ const formatPercentageValue = (value: ReportRow['percentage']): string => {
 
                         if (column.key === 'citation' && typeof row.citation === 'string' && row.citation.trim()) {
                           cellProps.title = row.citation;
+                        }
+
+                        if (column.key === 'comments') {
+                          const commentText = getRowCommentText(row);
+                          if (commentText) {
+                            cellProps.title = commentText;
+                          }
                         }
 
                         return (
