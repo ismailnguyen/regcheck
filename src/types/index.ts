@@ -134,9 +134,22 @@ export interface RecipeIngredientInput extends IngredientInput {
 
 // Built-in data constants
 export const COUNTRIES: Country[] = [
-  "United States", "Japan", "United Kingdom", "Northern Ireland", "Portugal", 
+  "United States",
+  "Japan", "United Kingdom", "Northern Ireland", "Portugal", 
   "India", "Spain", "Canada", "Latvia", "Sweden", "Netherlands", "Belgium", 
-  "China", "Poland", "Italy", "France", "Australia", "Lithuania", "Germany", "Estonia"
+  "China", "Poland", "Italy", "France", "Australia", "Lithuania", "Germany", "Estonia",
+  "Brazil", 
+  "Chili",
+  "Republic of Korea",
+  "European Union",
+  "Malaysia",
+  "Mexico", 
+  "New Zealand", 
+  "Russian Federation", 
+  "Sri Lanka", 
+  "Switzerland", 
+  "Taiwan", 
+  "Turkey"
 ];
 
 export const USAGES: Usage[] = [
