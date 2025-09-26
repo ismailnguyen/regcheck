@@ -167,7 +167,8 @@ export const USAGES: Usage[] = [
   "Products",
   "Face Makeup Remover",
   "Facial Sunscreen Products",
-  "sunscreen"
+  "sunscreen",
+  "Face cream"
 ];
 
 export const ID_TYPES: IdType[] = [
