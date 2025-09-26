@@ -149,7 +149,11 @@ export const COUNTRIES: Country[] = [
   "Sri Lanka", 
   "Switzerland", 
   "Taiwan", 
-  "Turkey"
+  "Turkey",
+  "Singapore",
+  "Philippines",
+  "Indonesia",
+  "Thailand"
 ];
 
 export const USAGES: Usage[] = [
