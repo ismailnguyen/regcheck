@@ -480,7 +480,7 @@ const buildRecipePayload = (
 
 const Index = () => {
   // Default active tab/pane
-  const [activeMode, setActiveMode] = useState<Mode>("recipe");
+  const [activeMode, setActiveMode] = useState<Mode>("ingredients");
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
