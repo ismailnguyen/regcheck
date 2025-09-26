@@ -160,15 +160,15 @@ export const USAGES: Usage[] = [
   "Baby Cream", "Eye Concealer", "Antidandruff", "Artificial Nail", "Baby Oil", 
   "Eyeliner", "Eye Cream", "Eye Mask", "Face Scrub", "Face Serum", "Rouges", 
   "Hair Bleaching", "Hair Conditioner", "Lip balm", "Lip Gloss", "Lip Pencil", 
-  "Lipstick", "Nail Polish", "Toothpaste", "Body Lotion", "eau de toilette",
+  "Lipstick", "Nail Polish", "Toothpaste", "Body Lotion", "Eau de toilette",
   "Shower Gel",
   "Body Cream",
   "Non-skin Contact",
   "Products",
   "Face Makeup Remover",
   "Facial Sunscreen Products",
-  "sunscreen",
-  "Face cream"
+  "Sunscreen",
+  "Face Cream"
 ];
 
 export const ID_TYPES: IdType[] = [
