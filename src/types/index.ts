@@ -145,7 +145,7 @@ export const COUNTRIES: Country[] = [
   "Malaysia",
   "Mexico", 
   "New Zealand", 
-  "Russian Federation", 
+  "Russia", 
   "Sri Lanka", 
   "Switzerland", 
   "Taiwan", 
