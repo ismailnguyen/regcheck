@@ -173,34 +173,18 @@ const computeIngredientResults = (body: unknown): { results: ReportRow[]; summar
   return { results, summary };
 };
 
-const extractNotListedMatrixRows = (source: unknown, existingKeys: Set<string>): ReportRow[] => {
-  const collected: Record<string, unknown>[] = [];
+interface MatrixContext {
+  country?: string;
+  usage?: string;
+  resultIndicator?: string;
+  spec?: string;
+}
 
-  const visit = (value: unknown) => {
-    if (!value) {
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-    if (!isRecord(value)) {
-      return;
-    }
-
-    const indicatorRaw = value.resultIndicator ?? value.status ?? value.listingStatus ?? value.indicator;
-    if (typeof indicatorRaw === "string") {
-      const normalizedIndicator = indicatorRaw.replace(/_/g, " ").trim().toUpperCase();
-      if (normalizedIndicator.includes("NOT") && normalizedIndicator.includes("LISTED")) {
-        collected.push(value);
-      }
-    }
-
-    Object.values(value).forEach(visit);
-  };
-
-  visit(source);
-
+const extractNotListedMatrixRows = (
+  source: unknown,
+  existingKeys: Set<string>,
+  context: MatrixContext = {},
+): ReportRow[] => {
   const rows: ReportRow[] = [];
 
   const toStringValue = (entry: Record<string, unknown>, keys: string[], fallback?: string): string => {
@@ -222,7 +206,7 @@ const extractNotListedMatrixRows = (source: unknown, existingKeys: Set<string>):
     return fallback ?? "";
   };
 
-  const toNumberValue = (entry: Record<string, unknown>, keys: string[]): number | null => {
+  const toNumberValue = (entry: Record<string, unknown>, keys: string[], fallback?: number | null): number | null => {
     for (const key of keys) {
       const raw = entry[key];
       if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -235,7 +219,7 @@ const extractNotListedMatrixRows = (source: unknown, existingKeys: Set<string>):
         }
       }
     }
-    return null;
+    return fallback ?? null;
   };
 
   const toObjectMap = (entry: Record<string, unknown>, keys: string[]): Record<string, string> | null => {
@@ -256,61 +240,112 @@ const extractNotListedMatrixRows = (source: unknown, existingKeys: Set<string>):
     return null;
   };
 
-  collected.forEach((entry) => {
-    const record = entry as Record<string, unknown>;
-    const name = toStringValue(record, [
-      "ingredientName",
-      "ingredient",
-      "name",
-      "customerName",
-      "customerId",
-      "idValue",
-      "description",
-    ], "Unknown Ingredient");
-
-    const country = toStringValue(record, ["country", "countryName", "countries", "jurisdiction"], "");
-    const usage = toStringValue(record, ["usage", "usageName", "application", "applications", "category"], "");
-
-    const key = `${name}::${country}::${usage}::NOT LISTED`.toLowerCase();
-    if (existingKeys.has(key)) {
+  const visit = (value: unknown, ctx: MatrixContext) => {
+    if (!value) {
       return;
     }
 
-    const idValue = toStringValue(record, ["idValue", "identifier", "ingredientId", "decernisId"], name);
-    const idType = toStringValue(record, ["idType", "identifierType"], "Not Listed");
-    const functionValue = toStringValue(record, ["function", "role", "functionality"], "");
-    const decernisName = toStringValue(record, ["decernisName", "decernisIngredientName"], "");
-    const threshold = toStringValue(record, ["threshold", "limit", "maximumLevel"], "");
-    const citation = toStringValue(record, ["citation", "reference", "legalCitation"], "");
-    const regulation = toStringValue(record, ["regulation", "regulationName", "regulationReference"], "");
-    const hyperlink = toStringValue(record, ["hyperlink", "link", "url"], "");
-    const percentage = toNumberValue(record, ["percentage", "concentration"]);
-    const otherIdentifiers = toObjectMap(record, ["otherIdentifiers", "identifiers"]);
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, ctx));
+      return;
+    }
 
-    const normalizedRow: ReportRow = {
-      customerId: name,
-      customerName: name,
-      idType: idType || "Not Listed",
-      idValue: idValue || name,
-      decernisName: decernisName || null,
-      country,
-      usage,
-      function: functionValue ? functionValue : null,
-      resultIndicator: "NOT LISTED",
-      threshold: threshold || null,
-      citation: citation || null,
-      color: null,
-      comments: null,
-      hyperlink: hyperlink || null,
-      percentage: percentage ?? null,
-      spec: null,
-      regulation: regulation || null,
-      otherIdentifiers,
-    };
+    if (!isRecord(value)) {
+      return;
+    }
 
-    existingKeys.add(key);
-    rows.push(normalizedRow);
-  });
+    const nextContext: MatrixContext = { ...ctx };
+
+    const countryCandidate = toStringValue(value, ["country", "countryName", "countries", "jurisdiction"], undefined);
+    if (countryCandidate) {
+      nextContext.country = countryCandidate;
+    }
+
+    const usageCandidate = toStringValue(value, ["usage", "usageName", "application", "applications", "category"], undefined);
+    if (usageCandidate) {
+      nextContext.usage = usageCandidate;
+    }
+
+    const specCandidate = toStringValue(value, ["spec", "specification", "ingredientSpec"], undefined);
+    if (specCandidate) {
+      nextContext.spec = specCandidate;
+    }
+
+    const indicatorRaw = value.resultIndicator ?? value.status ?? value.listingStatus ?? value.indicator ?? nextContext.resultIndicator;
+    const normalizedIndicator = typeof indicatorRaw === "string"
+      ? indicatorRaw.replace(/_/g, " ").trim().toUpperCase()
+      : undefined;
+    if (normalizedIndicator) {
+      nextContext.resultIndicator = normalizedIndicator;
+    }
+
+    const hasIngredientDetails = Boolean(
+      value.ingredientName || value.ingredient || value.name || value.customerName || value.customerId || value.idValue,
+    );
+
+    const shouldCollect = Boolean(
+      normalizedIndicator &&
+      normalizedIndicator.includes("NOT") &&
+      normalizedIndicator.includes("LISTED") &&
+      hasIngredientDetails,
+    );
+
+    if (shouldCollect) {
+      const record = value as Record<string, unknown>;
+      const name = toStringValue(record, [
+        "ingredientName",
+        "ingredient",
+        "name",
+        "customerName",
+        "customerId",
+        "description",
+      ], "Unknown Ingredient");
+
+      const idValue = toStringValue(record, ["idValue", "identifier", "ingredientId", "decernisId"], name);
+      const idType = toStringValue(record, ["idType", "identifierType"], "Not Listed");
+      const functionValue = toStringValue(record, ["function", "role", "functionality"], "");
+      const decernisName = toStringValue(record, ["decernisName", "decernisIngredientName"], "");
+      const threshold = toStringValue(record, ["threshold", "limit", "maximumLevel"], "");
+      const citation = toStringValue(record, ["citation", "reference", "legalCitation"], "");
+      const regulation = toStringValue(record, ["regulation", "regulationName", "regulationReference"], "");
+      const hyperlink = toStringValue(record, ["hyperlink", "link", "url"], "");
+      const percentage = toNumberValue(record, ["percentage", "concentration"], null);
+      const otherIdentifiers = toObjectMap(record, ["otherIdentifiers", "identifiers"]);
+
+      const normalizedRow: ReportRow = {
+        customerId: name,
+        customerName: name,
+        idType: idType || "Not Listed",
+        idValue: idValue || name,
+        decernisName: decernisName || null,
+        country: nextContext.country ?? "",
+        usage: nextContext.usage ?? "",
+        function: functionValue ? functionValue : null,
+        resultIndicator: nextContext.resultIndicator ?? "NOT LISTED",
+        threshold: threshold || null,
+        citation: citation || null,
+        color: null,
+        comments: null,
+        hyperlink: hyperlink || null,
+        percentage: percentage ?? null,
+        spec: nextContext.spec ?? null,
+        regulation: regulation || null,
+        otherIdentifiers,
+      };
+
+      const key = createRowCombinationKey(normalizedRow);
+      if (!existingKeys.has(key)) {
+        existingKeys.add(key);
+        rows.push(normalizedRow);
+      }
+    }
+
+    Object.values(value).forEach((child) => {
+      visit(child, nextContext);
+    });
+  };
+
+  visit(source, context);
 
   return rows;
 };
@@ -363,10 +398,33 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
     }));
   }
 
-  const existingKeys = new Set(results.map((row) => `${row.customerName}::${row.country || ""}::${row.usage || ""}::${row.resultIndicator}`.toLowerCase()));
+  const existingKeys = new Set(results.map((row) => createRowCombinationKey(row)));
+
+  const perEntryMatrixRows: ReportRow[] = [];
+  if (recipeReportContainer?.recipeReport && Array.isArray(recipeReportContainer.recipeReport)) {
+    recipeReportContainer.recipeReport.forEach((entry) => {
+      if (!Array.isArray(entry.matrixReport) || entry.matrixReport.length === 0) {
+        return;
+      }
+
+      const entryContext: MatrixContext = {
+        country: typeof entry.country === "string" ? entry.country : undefined,
+        resultIndicator: typeof entry.resultIndicator === "string"
+          ? entry.resultIndicator.replace(/_/g, " ").trim().toUpperCase()
+          : undefined,
+      };
+
+      perEntryMatrixRows.push(
+        ...extractNotListedMatrixRows(entry.matrixReport, existingKeys, entryContext),
+      );
+    });
+  }
 
   const matrixSource = recipeReportContainer?.matrixReport ?? (apiResponse as { recipeMatrixReport?: unknown }).recipeMatrixReport;
-  const notListedRows = extractNotListedMatrixRows(matrixSource ?? apiResponse, existingKeys);
+  const notListedRows = [
+    ...perEntryMatrixRows,
+    ...extractNotListedMatrixRows(matrixSource ?? apiResponse, existingKeys),
+  ];
   if (notListedRows.length > 0) {
     results = [...results, ...notListedRows];
   }
