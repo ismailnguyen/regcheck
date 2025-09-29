@@ -17,6 +17,8 @@ import {
   saveRecipeValidationResult,
   deleteIngredientValidationResult,
   deleteRecipeValidationResult,
+  getActiveMode as getStoredActiveMode,
+  setActiveMode as setStoredActiveMode,
 } from "@/lib/storage";
 import {
   runValidationJob,
@@ -753,7 +755,7 @@ const buildRecipePayload = (
 
 const Index = () => {
   // Default active tab/pane
-  const [activeMode, setActiveMode] = useState<Mode>("ingredients");
+  const [activeMode, setActiveModeState] = useState<Mode>(() => getStoredActiveMode() ?? "ingredients");
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -779,6 +781,11 @@ const Index = () => {
   const [recipeSpec, setRecipeSpec] = useState("");
   const [recipeIncludeIngredientAnalysis, setRecipeIncludeIngredientAnalysis] = useState(false);
   const [recipeCountrySummaries, setRecipeCountrySummaries] = useState<CountryIndicatorSummary[]>([]);
+
+  const setActiveMode = useCallback((mode: Mode) => {
+    setActiveModeState(mode);
+    setStoredActiveMode(mode);
+  }, []);
 
   const [recipeResults, setRecipeResults] = useState<ReportRow[]>([]);
   const [recipeSummary, setRecipeSummary] = useState<ResultSummary>();

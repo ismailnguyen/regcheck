@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   DEBUG_MODE: "regcheck.debugMode",
   INGREDIENT_HISTORY: "regcheck.validationHistory",
   RECIPE_HISTORY: "regcheck.recipeHistory",
+  ACTIVE_MODE: "regcheck.activeMode",
 } as const;
 
 export const DEFAULT_INGREDIENT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
@@ -137,4 +138,19 @@ export const storeIngredient = (ingredient: IngredientInput): void => {
     stored.push(ingredient);
     localStorage.setItem('regcheck.ingredients', JSON.stringify(stored));
   }
+};
+
+// Active mode management
+type BuilderMode = "ingredients" | "recipe";
+
+export const getActiveMode = (): BuilderMode | null => {
+  const stored = localStorage.getItem(STORAGE_KEYS.ACTIVE_MODE);
+  if (stored === "ingredients" || stored === "recipe") {
+    return stored;
+  }
+  return null;
+};
+
+export const setActiveMode = (mode: BuilderMode): void => {
+  localStorage.setItem(STORAGE_KEYS.ACTIVE_MODE, mode);
 };
