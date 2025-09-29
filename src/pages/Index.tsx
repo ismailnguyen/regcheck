@@ -34,6 +34,7 @@ import type {
   ReportRow,
   ResultSummary,
   ResultComments,
+  CountryIndicatorSummary,
   DebugInfo,
   DebugRequestInfo,
   AppSettings,
@@ -45,6 +46,7 @@ import type {
 import { ID_TYPES } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const TAB_BUILDER = "builder" as const;
 const TAB_HISTORY = "history" as const;
@@ -350,7 +352,11 @@ const extractNotListedMatrixRows = (
   return rows;
 };
 
-const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: ResultSummary } => {
+const computeRecipeResults = (body: unknown): {
+  results: ReportRow[];
+  summary: ResultSummary;
+  countrySummaries: CountryIndicatorSummary[];
+} => {
   if (!isRecord(body)) {
     throw new Error("Response body must be a JSON object");
   }
@@ -378,10 +384,21 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
   const recipeReportContainer = apiResponse.recipeAnalaysisReport || apiResponse.recipeAnalysisReport;
   let results: ReportRow[] = [];
 
+  const countrySummaries: CountryIndicatorSummary[] = [];
+
   if (recipeReportContainer?.recipeReport && Array.isArray(recipeReportContainer.recipeReport)) {
     results = recipeReportContainer.recipeReport.flatMap((entry) => {
       const entryCountry = entry.country || "";
       const entryIndicator = entry.resultIndicator;
+      if (entryCountry) {
+        const normalizedIndicator = typeof entryIndicator === "string"
+          ? entryIndicator.replace(/_/g, " ").trim().toUpperCase()
+          : "UNKNOWN";
+        countrySummaries.push({
+          country: entryCountry,
+          resultIndicator: normalizedIndicator || "UNKNOWN",
+        });
+      }
       const tabular = Array.isArray(entry.tabularReport) ? entry.tabularReport : [];
       return tabular.map((row) => ({
         ...row,
@@ -444,7 +461,30 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
       (summary.countsByIndicator[indicator] || 0) + 1;
   });
 
-  return { results, summary };
+  if (countrySummaries.length === 0 && Array.isArray(recipeReportContainer?.recipeReport)) {
+    recipeReportContainer?.recipeReport.forEach((entry) => {
+      if (!entry.country) {
+        return;
+      }
+      const normalizedIndicator = typeof entry.resultIndicator === "string"
+        ? entry.resultIndicator.replace(/_/g, " ").trim().toUpperCase()
+        : "UNKNOWN";
+      countrySummaries.push({
+        country: entry.country,
+        resultIndicator: normalizedIndicator || "UNKNOWN",
+      });
+    });
+  }
+
+  const uniqueCountrySummaries = countrySummaries.reduce<CountryIndicatorSummary[]>((acc, entry) => {
+    if (acc.some((existing) => existing.country.toLowerCase() === entry.country.toLowerCase())) {
+      return acc;
+    }
+    acc.push(entry);
+    return acc;
+  }, []);
+
+  return { results, summary, countrySummaries: uniqueCountrySummaries };
 };
 
 const hasMeaningfulValue = (value: unknown): boolean => {
@@ -738,6 +778,7 @@ const Index = () => {
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientInput[]>([]);
   const [recipeSpec, setRecipeSpec] = useState("");
   const [recipeIncludeIngredientAnalysis, setRecipeIncludeIngredientAnalysis] = useState(false);
+  const [recipeCountrySummaries, setRecipeCountrySummaries] = useState<CountryIndicatorSummary[]>([]);
 
   const [recipeResults, setRecipeResults] = useState<ReportRow[]>([]);
   const [recipeSummary, setRecipeSummary] = useState<ResultSummary>();
@@ -819,6 +860,7 @@ const Index = () => {
     setRecipeSummary(undefined);
     setRecipeDebugInfo(null);
     setRecipeIncludeIngredientAnalysis(false);
+    setRecipeCountrySummaries([]);
   };
 
   const ingredientRequestPayload = useMemo<IngredientRequestPayload>(
@@ -1204,10 +1246,11 @@ const Index = () => {
 
     try {
       const parsed = JSON.parse(value);
-      const { results, summary } = computeRecipeResults(parsed);
+      const { results, summary, countrySummaries } = computeRecipeResults(parsed);
 
       setRecipeResults(results);
       setRecipeSummary(summary);
+      setRecipeCountrySummaries(countrySummaries);
 
       if (recipeDebugInfo) {
         recipeResponseApplyingRef.current = true;
@@ -1426,6 +1469,7 @@ const Index = () => {
 
     setRecipeIsRunning(true);
     setRecipeDebugInfo(null);
+    setRecipeCountrySummaries([]);
     let jobRecord: ValidationJobRecord | null = null;
     let responseBody: unknown = null;
     let responseStatus = 0;
@@ -1464,7 +1508,7 @@ const Index = () => {
         throw new Error("Unexpected API response format");
       }
 
-      const { results: normalizedResults } = computeRecipeResults(body);
+      const { results: normalizedResults, countrySummaries } = computeRecipeResults(body);
 
       recipeIngredients.forEach(({ percentage: _percentage, function: _function, spec: _spec, ...base }) => {
         storeIngredient(base);
@@ -1524,6 +1568,7 @@ const Index = () => {
 
       setRecipeResults(combinedResults);
       setRecipeSummary(combinedSummary);
+      setRecipeCountrySummaries(countrySummaries);
 
       toast({
         title: "Recipe Validation Complete",
@@ -1576,6 +1621,7 @@ const Index = () => {
           includeIngredientAnalysis: includeIngredientAnalysis || undefined,
         },
         metrics,
+        countrySummaries: countrySummaries.length > 0 ? countrySummaries.map((entry) => ({ ...entry })) : undefined,
       };
 
       saveRecipeValidationResult(record);
@@ -1662,6 +1708,7 @@ const Index = () => {
     payload: currentRequestPayload,
   };
   const displayedRequestInfo = currentDebugInfo?.request ?? defaultRequestInfo;
+  const currentCountrySummaries = activeMode === "recipe" ? recipeCountrySummaries : [];
 
   const handleTabChange = (value: string) => {
     const val = value as TabValue;
@@ -1761,7 +1808,38 @@ const Index = () => {
           <TabsContent value={TAB_BUILDER}>
             <div className="grid gap-6 grid-cols-3">
               {(currentResults.length > 0 || currentIsRunning) && (
-                <div className="col-span-3">
+                <div className="col-span-3 space-y-4">
+                  {activeMode === "recipe" && currentCountrySummaries.length > 0 && !currentIsRunning && (
+                    <div className="rounded-lg border bg-card p-4 shadow-sm">
+                      <div className="flex flex-col gap-2">
+                        <div className="text-sm font-semibold">Country status overview</div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                          {currentCountrySummaries.map(({ country, resultIndicator }) => {
+                            const normalizedIndicator = resultIndicator.trim() || "UNKNOWN";
+                            let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "default";
+                            if (normalizedIndicator.includes("PROHIBITED")) {
+                              badgeVariant = "destructive";
+                            } else if (normalizedIndicator.includes("RESTRICTED")) {
+                              badgeVariant = "outline";
+                            } else if (normalizedIndicator.includes("LISTED") || normalizedIndicator.includes("ALLOWED")) {
+                              badgeVariant = "secondary";
+                            }
+                            return (
+                              <div
+                                key={country}
+                                className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
+                              >
+                                <span className="text-sm font-medium truncate pr-2" title={country}>{country}</span>
+                                <Badge variant={badgeVariant} className="text-xs">
+                                  {normalizedIndicator}
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <ResultsTable
                     data={currentResults}
                     summary={currentSummary}

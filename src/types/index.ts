@@ -69,6 +69,11 @@ export interface ResultSummary {
   total: number;
 }
 
+export interface CountryIndicatorSummary {
+  country: string;
+  resultIndicator: string;
+}
+
 export interface AppSettings {
   apiKey: string;
   debugMode?: boolean;
@@ -104,6 +109,7 @@ export interface ValidationResultRecord {
   results: ReportRow[];
   scenario: ValidationScenarioSnapshot;
   metrics?: ValidationRunMetrics;
+  countrySummaries?: CountryIndicatorSummary[];
 }
 
 export interface DebugRequestInfo {

@@ -138,6 +138,35 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
                 {selectedRecord.scenario.includeIngredientAnalysis && (
                   <div><u>Recipe Options:</u> Ingredient analysis included</div>
                 )}
+                {selectedRecord.countrySummaries && selectedRecord.countrySummaries.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    <u>Country restrictions overview:</u>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {selectedRecord.countrySummaries.map(({ country, resultIndicator }) => {
+                        const normalized = resultIndicator.trim() || "UNKNOWN";
+                        let variant: "default" | "secondary" | "destructive" | "outline" = "default";
+                        if (normalized.includes("PROHIBITED")) {
+                          variant = "destructive";
+                        } else if (normalized.includes("RESTRICTED")) {
+                          variant = "outline";
+                        } else if (normalized.includes("LISTED") || normalized.includes("ALLOWED")) {
+                          variant = "secondary";
+                        }
+                        return (
+                          <div
+                            key={`${country}-${normalized}`}
+                            className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
+                          >
+                            <span className="text-sm font-medium truncate pr-2" title={country}>{country}</span>
+                            <Badge variant={variant} className="text-xs">
+                              {normalized}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="sm:col-span-2 lg:col-span-3 mb-4">
                   <u>Ingredients:</u> {selectedRecord.scenario.ingredients.length > 0
                     ? selectedRecord.scenario.ingredients.map((ing) => {
