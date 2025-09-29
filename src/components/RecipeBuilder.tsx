@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Plus, Trash2, Copy, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -29,17 +29,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getStoredIngredients } from "@/lib/storage";
 import { ID_TYPES } from "@/types";
 import type { RecipeIngredientInput, IdType } from "@/types";
+import { Switch } from "@/components/ui/switch";
 
 interface RecipeBuilderProps {
   ingredients: RecipeIngredientInput[];
   recipeSpec: string;
   onRecipeSpecChange: (spec: string) => void;
   onIngredientsChange: (ingredients: RecipeIngredientInput[]) => void;
+  includeIngredientAnalysis: boolean;
+  onIncludeIngredientAnalysisChange: (enabled: boolean) => void;
 }
 
-export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onIngredientsChange }: RecipeBuilderProps) {
+export function RecipeBuilder({
+  ingredients,
+  recipeSpec,
+  onRecipeSpecChange,
+  onIngredientsChange,
+  includeIngredientAnalysis,
+  onIncludeIngredientAnalysisChange,
+}: RecipeBuilderProps) {
   const [autoCompleteOpen, setAutoCompleteOpen] = useState<string | null>(null);
   const storedIngredients = getStoredIngredients();
+  const includeIngredientSwitchId = useId();
 
   const totalPercentage = useMemo(() => (
     ingredients.reduce((total, ing) => total + (Number.isFinite(ing.percentage) ? ing.percentage : 0), 0)
@@ -120,10 +131,22 @@ export function RecipeBuilder({ ingredients, recipeSpec, onRecipeSpecChange, onI
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg font-semibold">Recipe Ingredients</CardTitle>
-          <div className="text-sm text-muted-foreground">
-            Total: <span className="font-medium">{totalPercentage.toFixed(2)}%</span>
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="text-sm text-muted-foreground">
+              Total: <span className="font-medium">{totalPercentage.toFixed(2)}%</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Switch
+                id={includeIngredientSwitchId}
+                checked={includeIngredientAnalysis}
+                onCheckedChange={onIncludeIngredientAnalysisChange}
+              />
+              <Label htmlFor={includeIngredientSwitchId} className="leading-none cursor-pointer text-muted-foreground">
+                Include ingredient analysis
+              </Label>
+            </div>
           </div>
         </div>
         <div className="flex flex-col space-y-3">

@@ -33,6 +33,7 @@ import type {
   RecipeIngredientInput,
   ReportRow,
   ResultSummary,
+  ResultComments,
   DebugInfo,
   DebugRequestInfo,
   AppSettings,
@@ -388,6 +389,180 @@ const computeRecipeResults = (body: unknown): { results: ReportRow[]; summary: R
   return { results, summary };
 };
 
+const hasMeaningfulValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some(item => hasMeaningfulValue(item));
+  }
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some(entry => hasMeaningfulValue(entry));
+  }
+  return true;
+};
+
+const normalizeKeyPart = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value.trim().toLowerCase();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toString();
+  }
+  return "";
+};
+
+const createRowCombinationKey = (row: ReportRow): string => {
+  return [
+    normalizeKeyPart(row.idValue),
+    normalizeKeyPart(row.customerName),
+    normalizeKeyPart(row.customerId),
+    normalizeKeyPart(row.decernisName),
+    normalizeKeyPart(row.country),
+    normalizeKeyPart(row.usage),
+    normalizeKeyPart(row.regulation),
+    normalizeKeyPart(row.threshold),
+    normalizeKeyPart(row.resultIndicator),
+  ].join("|");
+};
+
+const mergeReportRowDetails = (base: ReportRow, incoming: ReportRow): ReportRow => {
+  const merged: ReportRow = { ...base };
+  const mergeableFields: (keyof ReportRow)[] = [
+    "customerId",
+    "customerName",
+    "idType",
+    "idValue",
+    "decernisId",
+    "decernisName",
+    "country",
+    "usage",
+    "function",
+    "threshold",
+    "citation",
+    "color",
+    "hyperlink",
+    "spec",
+    "regulation",
+    "resultIndicator",
+  ];
+
+  const mergedRecord = merged as Record<string, unknown>;
+  const incomingRecord = incoming as Record<string, unknown>;
+
+  mergeableFields.forEach((field) => {
+    const candidate = incomingRecord[field];
+    if (!hasMeaningfulValue(candidate)) {
+      return;
+    }
+
+    const current = mergedRecord[field];
+    if (hasMeaningfulValue(current)) {
+      return;
+    }
+
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        mergedRecord[field] = trimmed;
+      }
+      return;
+    }
+
+    if (typeof candidate === "number") {
+      if (Number.isFinite(candidate)) {
+        mergedRecord[field] = candidate;
+      }
+      return;
+    }
+
+    mergedRecord[field] = candidate;
+  });
+
+  if (incoming.comments) {
+    const combinedComments: ResultComments = { ...(merged.comments ?? {}) };
+    let updated = false;
+
+    (Object.entries(incoming.comments) as [keyof ResultComments, unknown][]).forEach(([commentKey, commentValue]) => {
+      if (typeof commentValue === "string") {
+        const trimmed = commentValue.trim();
+        if (trimmed) {
+          combinedComments[commentKey] = trimmed;
+          updated = true;
+        }
+        return;
+      }
+
+      if (commentValue !== null && commentValue !== undefined) {
+        combinedComments[commentKey] = commentValue as ResultComments[keyof ResultComments];
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      merged.comments = combinedComments;
+    }
+  }
+
+  if (incoming.otherIdentifiers) {
+    merged.otherIdentifiers = {
+      ...(merged.otherIdentifiers ?? {}),
+      ...incoming.otherIdentifiers,
+    };
+  }
+
+  if (!hasMeaningfulValue(merged.percentage) && hasMeaningfulValue(incoming.percentage)) {
+    merged.percentage = typeof incoming.percentage === "string" ? incoming.percentage.trim() : incoming.percentage;
+  }
+
+  return merged;
+};
+
+const combineRecipeAndIngredientRows = (recipeRows: ReportRow[], ingredientRows: ReportRow[]): ReportRow[] => {
+  if (ingredientRows.length === 0) {
+    return recipeRows;
+  }
+
+  const map = new Map<string, ReportRow>();
+
+  recipeRows.forEach((row) => {
+    map.set(createRowCombinationKey(row), { ...row });
+  });
+
+  ingredientRows.forEach((row) => {
+    const key = createRowCombinationKey(row);
+    const existing = map.get(key);
+    if (existing) {
+      map.set(key, mergeReportRowDetails(existing, row));
+    } else {
+      map.set(key, { ...row });
+    }
+  });
+
+  return Array.from(map.values());
+};
+
+const summarizeResults = (rows: ReportRow[]): ResultSummary => {
+  const countsByIndicator: Record<string, number> = {};
+  rows.forEach((row) => {
+    const indicator = typeof row.resultIndicator === "string" && row.resultIndicator.trim()
+      ? row.resultIndicator.trim().toUpperCase()
+      : "UNKNOWN";
+    countsByIndicator[indicator] = (countsByIndicator[indicator] || 0) + 1;
+  });
+
+  return {
+    countsByIndicator,
+    total: rows.length,
+  };
+};
+
 const buildIngredientPayload = (
   scenarioName: string,
   countries: Country[],
@@ -504,6 +679,7 @@ const Index = () => {
   const [recipeUsages, setRecipeUsages] = useState<Usage[]>([]);
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredientInput[]>([]);
   const [recipeSpec, setRecipeSpec] = useState("");
+  const [recipeIncludeIngredientAnalysis, setRecipeIncludeIngredientAnalysis] = useState(false);
 
   const [recipeResults, setRecipeResults] = useState<ReportRow[]>([]);
   const [recipeSummary, setRecipeSummary] = useState<ResultSummary>();
@@ -584,6 +760,7 @@ const Index = () => {
     setRecipeResults([]);
     setRecipeSummary(undefined);
     setRecipeDebugInfo(null);
+    setRecipeIncludeIngredientAnalysis(false);
   };
 
   const ingredientRequestPayload = useMemo<IngredientRequestPayload>(
@@ -1176,6 +1353,19 @@ const Index = () => {
       payload: requestPayload,
     };
 
+    const includeIngredientAnalysis = recipeIncludeIngredientAnalysis;
+    const ingredientInputsFromRecipe: IngredientInput[] = includeIngredientAnalysis
+      ? recipeIngredients.map(({ id, name, idType, idValue }) => ({
+          id,
+          name,
+          idType,
+          idValue,
+        }))
+      : [];
+    const ingredientRequestPayloadForRecipe = includeIngredientAnalysis
+      ? buildIngredientPayload(recipeScenarioName, recipeCountries, recipeUsages, ingredientInputsFromRecipe)
+      : null;
+
     setRecipeIsRunning(true);
     setRecipeDebugInfo(null);
     let jobRecord: ValidationJobRecord | null = null;
@@ -1183,6 +1373,11 @@ const Index = () => {
     let responseStatus = 0;
     let responseStatusText = "";
     let responseWeightBytes: number | undefined;
+
+    let ingredientResponseBody: unknown = null;
+    let ingredientDurationMs = 0;
+    let ingredientWeightBytes: number | undefined;
+    let ingredientErrorMessage: string | null = null;
 
     try {
       jobRecord = await runValidationJob({
@@ -1211,32 +1406,97 @@ const Index = () => {
         throw new Error("Unexpected API response format");
       }
 
-      const { results: normalizedResults, summary } = computeRecipeResults(body);
+      const { results: normalizedResults } = computeRecipeResults(body);
 
       recipeIngredients.forEach(({ percentage: _percentage, function: _function, spec: _spec, ...base }) => {
         storeIngredient(base);
       });
 
-      setRecipeResults(normalizedResults);
-      setRecipeSummary(summary);
+      let combinedResults = normalizedResults;
+
+      if (includeIngredientAnalysis && ingredientRequestPayloadForRecipe) {
+        try {
+          const ingredientJobRecord = await runValidationJob({
+            endpointPath: INGREDIENT_ENDPOINT_PATH,
+            payload: ingredientRequestPayloadForRecipe,
+            apiKey: settings.apiKey,
+            metadata: {
+              scenarioName: recipeScenarioName || undefined,
+              type: "ingredient",
+            },
+          });
+
+          if (ingredientJobRecord.status === "failed") {
+            ingredientResponseBody = ingredientJobRecord.error?.details ?? ingredientJobRecord.result?.body ?? null;
+            throw new Error(ingredientJobRecord.error?.message || "Ingredient analysis failed");
+          }
+
+          const ingredientBody = ingredientJobRecord.result?.body;
+          ingredientResponseBody = ingredientBody ?? ingredientJobRecord.result?.rawBody ?? null;
+
+          if (!ingredientBody || typeof ingredientBody !== "object") {
+            throw new Error("Unexpected ingredient API response format");
+          }
+
+          const { results: ingredientResults } = computeIngredientResults(ingredientBody);
+          combinedResults = combineRecipeAndIngredientRows(normalizedResults, ingredientResults);
+
+          ingredientDurationMs = ingredientJobRecord.metrics?.durationMs ?? Math.max(
+            0,
+            new Date(ingredientJobRecord.updatedAt).getTime() - new Date(ingredientJobRecord.startedAt).getTime(),
+          );
+
+          const weight = ingredientJobRecord.result?.weightBytes;
+          if (typeof weight === "number" && Number.isFinite(weight)) {
+            ingredientWeightBytes = weight;
+          }
+        } catch (ingredientError) {
+          ingredientErrorMessage = ingredientError instanceof Error
+            ? ingredientError.message
+            : "Ingredient analysis failed";
+          toast({
+            title: "Ingredient Analysis Failed",
+            description: ingredientErrorMessage,
+            variant: "destructive",
+          });
+        }
+      }
+
+      const combinedSummary = summarizeResults(combinedResults);
+
+      setRecipeResults(combinedResults);
+      setRecipeSummary(combinedSummary);
 
       toast({
         title: "Recipe Validation Complete",
-        description: summary.total > 0
-          ? `Found ${summary.total} results across ${recipeCountries.length} countries and ${recipeUsages.length} usages.`
+        description: combinedSummary.total > 0
+          ? `Found ${combinedSummary.total} results across ${recipeCountries.length} countries and ${recipeUsages.length} usages.`
           : "The API call completed successfully but returned no results.",
       });
 
-      const computedDuration = jobRecord.metrics?.durationMs ?? Math.max(
+      const recipeDuration = jobRecord.metrics?.durationMs ?? Math.max(
         0,
         new Date(jobRecord.updatedAt).getTime() - new Date(jobRecord.startedAt).getTime(),
       );
+      const totalDuration = recipeDuration + ingredientDurationMs;
+
+      const combinedWeightBytes = (() => {
+        let total = 0;
+        let hasValue = false;
+        [responseWeightBytes, ingredientWeightBytes].forEach((weight) => {
+          if (typeof weight === "number" && Number.isFinite(weight)) {
+            total += weight;
+            hasValue = true;
+          }
+        });
+        return hasValue ? total : undefined;
+      })();
 
       const metrics: ValidationRunMetrics = {
-        durationMs: computedDuration,
+        durationMs: totalDuration,
         status: responseStatus,
         statusText: responseStatusText || undefined,
-        weightBytes: responseWeightBytes,
+        weightBytes: combinedWeightBytes,
       };
 
       const recordName = recipeScenarioName.trim() || `Recipe ${new Date().toLocaleString()}`;
@@ -1245,16 +1505,17 @@ const Index = () => {
         name: recordName,
         createdAt: new Date().toISOString(),
         summary: {
-          countsByIndicator: { ...summary.countsByIndicator },
-          total: summary.total,
+          countsByIndicator: { ...combinedSummary.countsByIndicator },
+          total: combinedSummary.total,
         },
-        results: normalizedResults,
+        results: combinedResults,
         scenario: {
           name: recipeScenarioName.trim() || undefined,
           countries: [...recipeCountries],
           usages: [...recipeUsages],
           ingredients: recipeIngredients.map((ingredient) => ({ ...ingredient })),
           spec: recipeSpecValue,
+          includeIngredientAnalysis: includeIngredientAnalysis || undefined,
         },
         metrics,
       };
@@ -1264,16 +1525,24 @@ const Index = () => {
       setSelectedRecipeHistoryId(record.id);
 
       if (debugEnabled) {
+        const debugBody = includeIngredientAnalysis
+          ? {
+              recipe: body,
+              ingredient: ingredientResponseBody,
+            }
+          : body;
+
         setRecipeDebugInfo({
           request: requestInfo,
           response: {
             durationMs: metrics.durationMs,
             status: responseStatus,
             statusText: responseStatusText,
-            weightBytes: responseWeightBytes,
-            body: body,
+            weightBytes: metrics.weightBytes,
+            body: debugBody,
           },
           jobId: jobRecord.jobId,
+          ...(ingredientErrorMessage ? { errorMessage: ingredientErrorMessage } : {}),
         });
       }
     } catch (error) {
@@ -1483,6 +1752,8 @@ const Index = () => {
                     recipeSpec={recipeSpec}
                     onRecipeSpecChange={setRecipeSpec}
                     onIngredientsChange={setRecipeIngredients}
+                    includeIngredientAnalysis={recipeIncludeIngredientAnalysis}
+                    onIncludeIngredientAnalysisChange={setRecipeIncludeIngredientAnalysis}
                   />
                 )}
                 <div className="flex justify-end gap-2">

@@ -86,6 +86,7 @@ export interface ValidationScenarioSnapshot {
   usages: Usage[];
   ingredients: ValidationScenarioIngredient[];
   spec?: string;
+  includeIngredientAnalysis?: boolean;
 }
 
 export interface ValidationRunMetrics {

@@ -135,6 +135,9 @@ export function ValidationHistory({ records, selectedRecordId, onSelectRecord, t
                 {selectedRecord.scenario.spec && (
                   <div><u>Specification:</u> {selectedRecord.scenario.spec}</div>
                 )}
+                {selectedRecord.scenario.includeIngredientAnalysis && (
+                  <div><u>Recipe Options:</u> Ingredient analysis included</div>
+                )}
                 <div className="sm:col-span-2 lg:col-span-3 mb-4">
                   <u>Ingredients:</u> {selectedRecord.scenario.ingredients.length > 0
                     ? selectedRecord.scenario.ingredients.map((ing) => {
