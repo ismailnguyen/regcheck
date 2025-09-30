@@ -147,7 +147,7 @@ export const COUNTRIES: Country[] = [
   "China", "Poland", "Italy", "France", "Australia", "Lithuania", "Germany", "Estonia",
   "Brazil", 
   "Chili",
-  "Republic of Korea",
+  "Korea",
   "European Union",
   "Malaysia",
   "Mexico", 
