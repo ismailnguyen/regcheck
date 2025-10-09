@@ -813,17 +813,43 @@ const Index = () => {
   const recipeResponseApplyingRef = useRef(false);
 
   useEffect(() => {
-    const ingredientHistoryData = getIngredientValidationHistory();
-    setIngredientHistory(ingredientHistoryData);
-    if (ingredientHistoryData.length > 0) {
-      setSelectedIngredientHistoryId(ingredientHistoryData[0].id);
-    }
+    let cancelled = false;
 
-    const recipeHistoryData = getRecipeValidationHistory();
-    setRecipeHistory(recipeHistoryData);
-    if (recipeHistoryData.length > 0) {
-      setSelectedRecipeHistoryId(recipeHistoryData[0].id);
-    }
+    const loadHistory = async () => {
+      try {
+        const [ingredientHistoryData, recipeHistoryData] = await Promise.all([
+          getIngredientValidationHistory(),
+          getRecipeValidationHistory(),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setIngredientHistory(ingredientHistoryData);
+        if (ingredientHistoryData.length > 0) {
+          setSelectedIngredientHistoryId(ingredientHistoryData[0].id);
+        }
+
+        setRecipeHistory(recipeHistoryData);
+        if (recipeHistoryData.length > 0) {
+          setSelectedRecipeHistoryId(recipeHistoryData[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to load validation history:", error);
+        toast({
+          title: "History Unavailable",
+          description: "We couldn't load previous validation runs. Try refreshing the page.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const ingredientCanRun =
@@ -1391,7 +1417,18 @@ const Index = () => {
         metrics,
       };
 
-      saveIngredientValidationResult(record);
+      try {
+        await saveIngredientValidationResult(record);
+      } catch (error) {
+        console.error("Failed to persist ingredient validation history:", error);
+        toast({
+          title: "History Not Saved",
+          description: error instanceof Error
+            ? error.message
+            : "The validation ran successfully, but storing the result failed.",
+          variant: "destructive",
+        });
+      }
       setIngredientHistory(prev => [record, ...prev]);
       setSelectedIngredientHistoryId(record.id);
 
@@ -1634,7 +1671,18 @@ const Index = () => {
         countrySummaries: countrySummaries.length > 0 ? countrySummaries.map((entry) => ({ ...entry })) : undefined,
       };
 
-      saveRecipeValidationResult(record);
+      try {
+        await saveRecipeValidationResult(record);
+      } catch (error) {
+        console.error("Failed to persist recipe validation history:", error);
+        toast({
+          title: "History Not Saved",
+          description: error instanceof Error
+            ? error.message
+            : "The validation ran successfully, but storing the result failed.",
+          variant: "destructive",
+        });
+      }
       setRecipeHistory(prev => [record, ...prev]);
       setSelectedRecipeHistoryId(record.id);
 
@@ -1737,29 +1785,47 @@ const Index = () => {
     }
   };
 
-  const handleIngredientHistoryDelete = (id: string) => {
-    deleteIngredientValidationResult(id);
-    setIngredientHistory(prev => {
-      const updated = prev.filter(record => record.id !== id);
-      setSelectedIngredientHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
-      return updated;
-    });
+  const handleIngredientHistoryDelete = async (id: string) => {
+    try {
+      await deleteIngredientValidationResult(id);
+      setIngredientHistory(prev => {
+        const updated = prev.filter(record => record.id !== id);
+        setSelectedIngredientHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
+        return updated;
+      });
+    } catch (error) {
+      console.error("Failed to delete ingredient history:", error);
+      toast({
+        title: "Delete Failed",
+        description: "We couldn't remove this ingredient validation run.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRecipeHistoryDelete = (id: string) => {
-    deleteRecipeValidationResult(id);
-    setRecipeHistory(prev => {
-      const updated = prev.filter(record => record.id !== id);
-      setSelectedRecipeHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
-      return updated;
-    });
+  const handleRecipeHistoryDelete = async (id: string) => {
+    try {
+      await deleteRecipeValidationResult(id);
+      setRecipeHistory(prev => {
+        const updated = prev.filter(record => record.id !== id);
+        setSelectedRecipeHistoryId(current => (current === id ? updated[0]?.id ?? null : current));
+        return updated;
+      });
+    } catch (error) {
+      console.error("Failed to delete recipe history:", error);
+      toast({
+        title: "Delete Failed",
+        description: "We couldn't remove this recipe validation run.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteCurrentHistoryRecord = (id: string) => {
     if (activeMode === "ingredients") {
-      handleIngredientHistoryDelete(id);
+      void handleIngredientHistoryDelete(id);
     } else {
-      handleRecipeHistoryDelete(id);
+      void handleRecipeHistoryDelete(id);
     }
   };
 
