@@ -20,6 +20,46 @@ const STORAGE_KEYS = {
 
 export const DEFAULT_INGREDIENT_ENDPOINT = `${API_BASE_URL}/v5/ingredient-analysis/transaction?report=tabular`;
 export const DEFAULT_RECIPE_ENDPOINT = `${API_BASE_URL}/v5/recipe-analysis/transaction`;
+
+const MAX_VALIDATION_HISTORY_ITEMS = 25;
+
+const isQuotaExceededError = (error: unknown): boolean => {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return (
+      error.name === "QuotaExceededError"
+      || error.name === "NS_ERROR_DOM_QUOTA_REACHED"
+      || error.code === 22
+      || error.code === 1014
+    );
+  }
+  return false;
+};
+
+const persistValidationHistory = (key: string, records: ValidationResultRecord[]): void => {
+  const history = records.slice(0, MAX_VALIDATION_HISTORY_ITEMS);
+
+  for (let remaining = history.length; remaining >= 0; remaining -= 1) {
+    try {
+      localStorage.setItem(key, JSON.stringify(history));
+      return;
+    } catch (error) {
+      if (!isQuotaExceededError(error)) {
+        console.error(`Failed to update ${key}:`, error);
+        return;
+      }
+      if (history.length === 0) {
+        break;
+      }
+      history.pop();
+    }
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+};
 // Settings management
 export const getSettings = (): Partial<AppSettings> => {
   return {
@@ -60,7 +100,7 @@ export const getIngredientValidationHistory = (): ValidationResultRecord[] => {
 export const saveIngredientValidationResult = (record: ValidationResultRecord): void => {
   const history = getIngredientValidationHistory();
   history.unshift(record);
-  localStorage.setItem(STORAGE_KEYS.INGREDIENT_HISTORY, JSON.stringify(history));
+  persistValidationHistory(STORAGE_KEYS.INGREDIENT_HISTORY, history);
 };
 
 export const deleteIngredientValidationResult = (id: string): void => {
@@ -80,7 +120,7 @@ export const getRecipeValidationHistory = (): ValidationResultRecord[] => {
 export const saveRecipeValidationResult = (record: ValidationResultRecord): void => {
   const history = getRecipeValidationHistory();
   history.unshift(record);
-  localStorage.setItem(STORAGE_KEYS.RECIPE_HISTORY, JSON.stringify(history));
+  persistValidationHistory(STORAGE_KEYS.RECIPE_HISTORY, history);
 };
 
 export const deleteRecipeValidationResult = (id: string): void => {
