@@ -529,6 +529,9 @@ const createRowCombinationKey = (row: ReportRow): string => {
     normalizeKeyPart(row.regulation),
     normalizeKeyPart(row.threshold),
     normalizeKeyPart(row.resultIndicator),
+    normalizeKeyPart(row.function),
+    normalizeKeyPart(row.citation),
+    normalizeKeyPart(row.comments)
   ].join("|");
 };
 
