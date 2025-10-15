@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react";
+import { Menu, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -6,12 +6,16 @@ type ValidationMode = 'ingredients' | 'recipe';
 
 interface RegCheckHeaderProps {
   onSettingsClick: () => void;
+  onMenuToggle: () => void;
+  isMenuOpen: boolean;
   mode: ValidationMode;
   onModeChange: (mode: ValidationMode) => void;
 }
 
 export function RegCheckHeader({
   onSettingsClick,
+  onMenuToggle,
+  isMenuOpen,
   mode,
   onModeChange,
 }: RegCheckHeaderProps) {
@@ -19,6 +23,18 @@ export function RegCheckHeader({
     <header className="border-b bg-card px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onMenuToggle}
+            aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-pressed={isMenuOpen}
+            aria-expanded={isMenuOpen}
+            aria-controls="regcheck-sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
           <h1 className="text-2xl font-bold">
             <Link
               to="/"

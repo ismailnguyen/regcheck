@@ -761,6 +761,7 @@ const Index = () => {
   const [activeMode, setActiveModeState] = useState<Mode>(() => getStoredActiveMode() ?? "ingredients");
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Ingredient builder state
   const [ingredientScenarioName, setIngredientScenarioName] = useState("");
@@ -788,6 +789,17 @@ const Index = () => {
   const setActiveMode = useCallback((mode: Mode) => {
     setActiveModeState(mode);
     setStoredActiveMode(mode);
+    setIsSidebarOpen(false);
+  }, []);
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
+  }, []);
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+  const handleSettingsClick = useCallback(() => {
+    setSettingsOpen(true);
+    setIsSidebarOpen(false);
   }, []);
 
   const [recipeResults, setRecipeResults] = useState<ReportRow[]>([]);
@@ -1868,140 +1880,195 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <RegCheckHeader
-        onSettingsClick={() => setSettingsOpen(true)}
-        mode={activeMode}
-        onModeChange={setActiveMode}
-      />
-      
-      <div className="container mx-auto px-2 py-6 2xl:max-w-none">
-        <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList>
-            <TabsTrigger value={TAB_BUILDER}>Validation Builder</TabsTrigger>
-            <TabsTrigger value={TAB_HISTORY}>{historyTabLabel}</TabsTrigger>
-          </TabsList>
+      <div className="relative z-40">
+        <RegCheckHeader
+          onSettingsClick={handleSettingsClick}
+          onMenuToggle={toggleSidebar}
+          isMenuOpen={isSidebarOpen}
+          mode={activeMode}
+          onModeChange={setActiveMode}
+        />
+      </div>
 
-          <TabsContent value={TAB_BUILDER}>
-            <div className="grid gap-6 grid-cols-3">
-              {(currentResults.length > 0 || currentIsRunning) && (
-                <div className="col-span-3 space-y-4">
-                  {activeMode === "recipe" && currentCountrySummaries.length > 0 && !currentIsRunning && (
-                    <div className="rounded-lg border bg-card p-4 shadow-sm">
-                      <div className="flex flex-col gap-2">
-                        <div className="text-sm font-semibold">Country status overview</div>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                          {currentCountrySummaries.map(({ country, resultIndicator }) => {
-                            const normalizedIndicator = resultIndicator.trim() || "UNKNOWN";
-                            let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "default";
-                            if (normalizedIndicator.includes("PROHIBITED")) {
-                              badgeVariant = "destructive";
-                            } else if (normalizedIndicator.includes("RESTRICTED")) {
-                              badgeVariant = "outline";
-                            } else if (normalizedIndicator.includes("LISTED") || normalizedIndicator.includes("ALLOWED")) {
-                              badgeVariant = "secondary";
-                            }
-                            return (
-                              <div
-                                key={country}
-                                className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
-                              >
-                                <span className="text-sm font-medium truncate pr-2" title={country}>{country}</span>
-                                <Badge variant={badgeVariant} className="text-xs">
-                                  {normalizedIndicator}
-                                </Badge>
-                              </div>
-                            );
-                          })}
+      <div className="relative">
+        <div
+          className={`fixed inset-0 z-30 bg-background/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+        <aside
+          id="regcheck-sidebar"
+          role="navigation"
+          className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r bg-card shadow-lg transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"}`}
+          aria-hidden={!isSidebarOpen}
+        >
+          <div className="flex h-full flex-col p-6">
+            <div className="text-lg font-semibold text-foreground">Menu</div>
+            <nav className="mt-6 space-y-2">
+              <Button
+                type="button"
+                variant={activeMode === "ingredients" ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveMode("ingredients")}
+                tabIndex={isSidebarOpen ? 0 : -1}
+              >
+                Ingredients analysis
+              </Button>
+              <Button
+                type="button"
+                variant={activeMode === "recipe" ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveMode("recipe")}
+                tabIndex={isSidebarOpen ? 0 : -1}
+              >
+                Recipe analysis
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={handleSettingsClick}
+                tabIndex={isSidebarOpen ? 0 : -1}
+              >
+                Settings
+              </Button>
+            </nav>
+          </div>
+        </aside>
+
+        <main
+          className={`transition-all duration-300 ease-in-out ${isSidebarOpen ? "lg:ml-64" : "lg:ml-0"}`}
+        >
+          <div className="container mx-auto px-2 py-6 2xl:max-w-none">
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
+              <TabsList>
+                <TabsTrigger value={TAB_BUILDER}>Validation Builder</TabsTrigger>
+                <TabsTrigger value={TAB_HISTORY}>{historyTabLabel}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value={TAB_BUILDER}>
+                <div className="grid gap-6 grid-cols-3">
+                  {(currentResults.length > 0 || currentIsRunning) && (
+                    <div className="col-span-3 space-y-4">
+                      {activeMode === "recipe" && currentCountrySummaries.length > 0 && !currentIsRunning && (
+                        <div className="rounded-lg border bg-card p-4 shadow-sm">
+                          <div className="flex flex-col gap-2">
+                            <div className="text-sm font-semibold">Country status overview</div>
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                              {currentCountrySummaries.map(({ country, resultIndicator }) => {
+                                const normalizedIndicator = resultIndicator.trim() || "UNKNOWN";
+                                let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "default";
+                                if (normalizedIndicator.includes("PROHIBITED")) {
+                                  badgeVariant = "destructive";
+                                } else if (normalizedIndicator.includes("RESTRICTED")) {
+                                  badgeVariant = "outline";
+                                } else if (normalizedIndicator.includes("LISTED") || normalizedIndicator.includes("ALLOWED")) {
+                                  badgeVariant = "secondary";
+                                }
+                                return (
+                                  <div
+                                    key={country}
+                                    className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
+                                  >
+                                    <span className="text-sm font-medium truncate pr-2" title={country}>{country}</span>
+                                    <Badge variant={badgeVariant} className="text-xs">
+                                      {normalizedIndicator}
+                                    </Badge>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
+                      <ResultsTable
+                        data={currentResults}
+                        summary={currentSummary}
+                        isLoading={currentIsRunning}
+                        title={currentResultsTitle}
+                        showPercentage={activeMode === "recipe"}
+                      />
                     </div>
                   )}
-                  <ResultsTable
-                    data={currentResults}
-                    summary={currentSummary}
-                    isLoading={currentIsRunning}
-                    title={currentResultsTitle}
-                    showPercentage={activeMode === "recipe"}
-                  />
-                </div>
-              )}
-              {debugModeEnabled && (
-                <div className="col-span-3">
-                  <DebugPanel
-                    request={displayedRequestInfo}
-                    response={currentDebugInfo?.response}
-                    errorMessage={currentDebugInfo?.errorMessage}
-                    jobId={currentDebugInfo?.jobId}
-                    payloadText={currentPayloadText}
-                    onPayloadTextChange={handlePayloadTextChange}
-                    payloadError={currentPayloadError}
-                    responseBodyText={currentResponseText}
-                    onResponseBodyTextChange={handleResponseTextChange}
-                    responseBodyError={currentResponseError}
-                  />
-                </div>
-              )}
-              <div>
-                <ScopeBuilder
-                  scenarioName={activeMode === "ingredients" ? ingredientScenarioName : recipeScenarioName}
-                  countries={activeMode === "ingredients" ? ingredientCountries : recipeCountries}
-                  usages={activeMode === "ingredients" ? ingredientUsages : recipeUsages}
-                  onScenarioNameChange={activeMode === "ingredients" ? setIngredientScenarioName : setRecipeScenarioName}
-                  onCountriesChange={activeMode === "ingredients" ? setIngredientCountries : setRecipeCountries}
-                  onUsagesChange={activeMode === "ingredients" ? setIngredientUsages : setRecipeUsages}
-                />
-              </div>
-              
-              <div className="col-span-2 space-y-4">
-                {activeMode === "ingredients" ? (
-                  <IngredientsBuilder
-                    ingredients={ingredientItems}
-                    onIngredientsChange={setIngredientItems}
-                  />
-                ) : (
-                  <RecipeBuilder
-                    ingredients={recipeIngredients}
-                    recipeSpec={recipeSpec}
-                    onRecipeSpecChange={setRecipeSpec}
-                    onIngredientsChange={setRecipeIngredients}
-                    includeIngredientAnalysis={recipeIncludeIngredientAnalysis}
-                    onIncludeIngredientAnalysisChange={setRecipeIncludeIngredientAnalysis}
-                  />
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={activeMode === "ingredients" ? resetIngredientBuilder : resetRecipeBuilder}
-                    disabled={currentIsRunning}
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={runActiveValidation}
-                    disabled={!currentCanRun || currentIsRunning}
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    {currentIsRunning ? "Analyzing..." : "Analyze compliance"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
+                  {debugModeEnabled && (
+                    <div className="col-span-3">
+                      <DebugPanel
+                        request={displayedRequestInfo}
+                        response={currentDebugInfo?.response}
+                        errorMessage={currentDebugInfo?.errorMessage}
+                        jobId={currentDebugInfo?.jobId}
+                        payloadText={currentPayloadText}
+                        onPayloadTextChange={handlePayloadTextChange}
+                        payloadError={currentPayloadError}
+                        responseBodyText={currentResponseText}
+                        onResponseBodyTextChange={handleResponseTextChange}
+                        responseBodyError={currentResponseError}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <ScopeBuilder
+                      scenarioName={activeMode === "ingredients" ? ingredientScenarioName : recipeScenarioName}
+                      countries={activeMode === "ingredients" ? ingredientCountries : recipeCountries}
+                      usages={activeMode === "ingredients" ? ingredientUsages : recipeUsages}
+                      onScenarioNameChange={activeMode === "ingredients" ? setIngredientScenarioName : setRecipeScenarioName}
+                      onCountriesChange={activeMode === "ingredients" ? setIngredientCountries : setRecipeCountries}
+                      onUsagesChange={activeMode === "ingredients" ? setIngredientUsages : setRecipeUsages}
+                    />
+                  </div>
 
-          <TabsContent value={TAB_HISTORY}>
-            <ValidationHistory
-              records={currentHistory}
-              selectedRecordId={currentSelectedHistoryId}
-              onSelectRecord={handleHistorySelect}
-              title={historyTitle}
-              onDeleteRecord={handleDeleteCurrentHistoryRecord}
-            />
-          </TabsContent>
-        </Tabs>
+                  <div className="col-span-2 space-y-4">
+                    {activeMode === "ingredients" ? (
+                      <IngredientsBuilder
+                        ingredients={ingredientItems}
+                        onIngredientsChange={setIngredientItems}
+                      />
+                    ) : (
+                      <RecipeBuilder
+                        ingredients={recipeIngredients}
+                        recipeSpec={recipeSpec}
+                        onRecipeSpecChange={setRecipeSpec}
+                        onIngredientsChange={setRecipeIngredients}
+                        includeIngredientAnalysis={recipeIncludeIngredientAnalysis}
+                        onIncludeIngredientAnalysisChange={setRecipeIncludeIngredientAnalysis}
+                      />
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={activeMode === "ingredients" ? resetIngredientBuilder : resetRecipeBuilder}
+                        disabled={currentIsRunning}
+                      >
+                        Reset
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={runActiveValidation}
+                        disabled={!currentCanRun || currentIsRunning}
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        {currentIsRunning ? "Analyzing..." : "Analyze compliance"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value={TAB_HISTORY}>
+                <ValidationHistory
+                  records={currentHistory}
+                  selectedRecordId={currentSelectedHistoryId}
+                  onSelectRecord={handleHistorySelect}
+                  title={historyTitle}
+                  onDeleteRecord={handleDeleteCurrentHistoryRecord}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </main>
       </div>
-      
+
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
