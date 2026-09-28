@@ -4,6 +4,7 @@
 
 [build.environment]
   VITE_DECERNIS_API_BASE_URL = "/.netlify/functions/decernis-proxy"
+  VITE_MAINTENANCE_MODE = "true"
   NODE_VERSION = "20"
   NPM_VERSION = "9.9.3"
 
